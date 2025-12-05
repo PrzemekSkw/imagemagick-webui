@@ -15,7 +15,7 @@ from sqlalchemy import select, delete
 from pathlib import Path
 import zipfile
 import io
-
+import re
 from app.core.database import get_db
 from app.core.security import get_current_user, get_current_user_optional
 from app.core.config import settings
@@ -329,11 +329,20 @@ async def get_preview(
     preview_dir = Path(validated_path).parent / "previews"
     preview_dir.mkdir(parents=True, exist_ok=True)
     
-    preview_filename = f"{Path(validated_path).stem}_page{page}.png"
+    # Sanitize stem to remove problematic characters
+    import re
+    stem_safe = re.sub(r'[^A-Za-z0-9_\-]', '_', Path(validated_path).stem)
+    preview_filename = f"{stem_safe}_page{page}.png"
     preview_path = preview_dir / preview_filename
     
-    # Validate preview path
-    validated_preview = validate_path(str(preview_path))
+    # Validate preview path: must be inside preview_dir
+    preview_path_abs = preview_path.resolve()
+    if not str(preview_path_abs).startswith(str(preview_dir.resolve())):
+        logger.warning(f"Preview path traversal attempt blocked: {preview_path} -> {preview_path_abs}")
+        raise HTTPException(status_code=403, detail="Access to preview denied.")
+    
+    # Validate again against global allowed directories for extra safety
+    validated_preview = validate_path(str(preview_path_abs))
     
     # Check if preview already exists
     if Path(validated_preview).exists():
