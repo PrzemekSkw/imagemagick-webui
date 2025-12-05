@@ -42,7 +42,7 @@ slowapi>=0.1.9,<1.0.0
 limits>=3.7.0,<6.0.0
 
 # Testing (compatible versions)
-pytest>=7.4.0,<8.0.0
+pytest>=7.4.0,<10.0.0
 pytest-asyncio>=0.23.0,<0.24.0
 
 # Utilities
