@@ -39,7 +39,7 @@ scipy>=1.11.0,<2.0.0
 
 # Security
 slowapi>=0.1.9,<1.0.0
-limits>=3.7.0,<4.0.0
+limits>=3.7.0,<6.0.0
 
 # Testing (compatible versions)
 pytest>=7.4.0,<8.0.0
