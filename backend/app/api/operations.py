@@ -2,6 +2,8 @@
 Operations API for image processing
 """
 
+import os
+import shlex
 from typing import List, Dict, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel, Field
@@ -12,6 +14,7 @@ import uuid
 
 from app.core.database import get_db
 from app.core.security import get_current_user_optional
+from app.core.config import settings
 from app.models.user import User
 from app.models.image import Image
 from app.models.job import Job, JobStatus
@@ -20,6 +23,39 @@ from app.services.queue_service import queue_service
 from app.workers.tasks import process_images, process_raw_command
 
 router = APIRouter()
+
+
+# Security: Path validation
+ALLOWED_DIRS = [
+    os.path.realpath(settings.upload_dir),
+    os.path.realpath(settings.output_dir),
+    os.path.realpath(settings.temp_dir),
+    '/app/uploads',
+    '/app/processed',
+    '/tmp'
+]
+
+
+def validate_path(file_path: str) -> str:
+    """
+    Validate that a file path is within allowed directories.
+    Prevents path traversal attacks.
+    """
+    if not file_path:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    
+    abs_path = os.path.realpath(file_path)
+    
+    is_allowed = any(
+        abs_path.startswith(os.path.realpath(allowed_dir))
+        for allowed_dir in ALLOWED_DIRS
+        if allowed_dir and os.path.exists(os.path.dirname(allowed_dir) or '/')
+    )
+    
+    if not is_allowed:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    return abs_path
 
 
 # Request models
@@ -577,21 +613,17 @@ async def remove_background_sync(
     from app.services.ai_service import ai_service
     from app.services.file_service import file_service
     from app.models.job import Job
-    import uuid
     import logging
     
     logger = logging.getLogger(__name__)
-    logger.info(f"Remove background request: image_id={request.image_id}, alpha_matting={request.alpha_matting}")
+    logger.info(f"Remove background request: image_id={request.image_id}")
     
     user_id = current_user.id if current_user else None
     
     # Check AI
-    logger.info("Checking AI service availability...")
     if not await ai_service.is_available():
         logger.error("AI service not available")
         raise HTTPException(status_code=503, detail="AI service not available")
-    
-    logger.info("AI service is available")
     
     # Get image
     query = select(Image).where(Image.id == request.image_id)
@@ -599,29 +631,27 @@ async def remove_background_sync(
     image = result.scalar_one_or_none()
     
     if not image:
-        logger.error(f"Image not found: {request.image_id}")
         raise HTTPException(status_code=404, detail="Image not found")
     
-    logger.info(f"Found image: {image.file_path}")
+    # Validate file path
+    validated_input_path = validate_path(image.file_path)
+    logger.info(f"Validated image path: {validated_input_path}")
     
     # Generate output path
     output_path = file_service.get_output_path(
-        Path(image.file_path).name,
+        Path(validated_input_path).name,
         "png",
         user_id
     )
-    logger.info(f"Output path: {output_path}")
     
     try:
         # Run AI background removal
         logger.info("Starting background removal...")
         result_path = await ai_service.remove_background(
-            image.file_path,
+            validated_input_path,
             output_path,
             alpha_matting=request.alpha_matting
         )
-        
-        logger.info(f"Background removal result: {result_path}")
         
         if not result_path or not Path(result_path).exists():
             logger.error("Background removal failed - no result file")
@@ -833,7 +863,6 @@ async def process_sync(
     from pathlib import Path
     from app.services.file_service import file_service
     from app.models.job import Job
-    import uuid
     import logging
     
     logger = logging.getLogger(__name__)
@@ -848,11 +877,13 @@ async def process_sync(
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
     
+    # Validate file path
+    validated_input_path = validate_path(image.file_path)
+    
     # Build operations
     operations = [op.model_dump() for op in request.operations]
     
     logger.info(f"PROCESS-SYNC: image_id={request.image_id}")
-    logger.info(f"PROCESS-SYNC: operations={operations}")
     
     # Determine operation name for history
     op_names = [op.get("operation", "") for op in operations]
@@ -877,31 +908,29 @@ async def process_sync(
     
     # For PDF input, ALWAYS force PNG output since ImageMagick rasterizes PDFs
     actual_output_format = request.output_format
-    is_pdf_input = image.file_path.lower().endswith('.pdf') or (image.mime_type and 'pdf' in image.mime_type.lower())
+    is_pdf_input = validated_input_path.lower().endswith('.pdf') or (image.mime_type and 'pdf' in image.mime_type.lower())
     if is_pdf_input:
         actual_output_format = 'png'  # PDF is rasterized, output as PNG
     
     # Generate output path
     output_path = file_service.get_output_path(
-        Path(image.file_path).name,
+        Path(validated_input_path).name,
         actual_output_format,
         user_id
     )
     
-    logger.info(f"PROCESS-SYNC: input={image.file_path}, output={output_path}")
+    logger.info(f"PROCESS-SYNC: input={validated_input_path}, output={output_path}")
     
     # Build and execute command
     command = await imagemagick_service.build_command(
-        image.file_path,
+        validated_input_path,
         output_path,
         operations
     )
     
-    logger.info(f"PROCESS-SYNC: command={command}")
+    logger.debug(f"PROCESS-SYNC: command={command}")
     
     success, stdout, stderr = await imagemagick_service.execute(command)
-    
-    logger.info(f"PROCESS-SYNC: success={success}, stderr={stderr[:500] if stderr else 'none'}")
     
     if not success or not Path(output_path).exists():
         raise HTTPException(status_code=500, detail=f"Processing failed: {stderr}")
@@ -971,7 +1000,6 @@ async def download_direct(
     from pathlib import Path
     from fastapi.responses import FileResponse
     from app.services.file_service import file_service
-    import os
     import tempfile
     
     user_id = current_user.id if current_user else None
@@ -984,12 +1012,15 @@ async def download_direct(
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
     
+    # Validate file path is within allowed directories
+    validated_input_path = validate_path(image.file_path)
+    
     # Build operations
     operations = [op.model_dump() for op in request.operations]
     
     # For PDF input, force image output since ImageMagick rasterizes PDFs
     actual_output_format = request.output_format
-    is_pdf_input = image.file_path.lower().endswith('.pdf') or (image.mime_type and 'pdf' in image.mime_type.lower())
+    is_pdf_input = validated_input_path.lower().endswith('.pdf') or (image.mime_type and 'pdf' in image.mime_type.lower())
     if is_pdf_input:
         actual_output_format = 'png'  # PDF is rasterized, output as PNG
     
@@ -997,12 +1028,12 @@ async def download_direct(
     original_name = Path(image.original_filename).stem
     output_filename = f"edited_{original_name}.{actual_output_format}"
     
-    # Use temp directory for output
+    # Use temp directory for output (already in allowed dirs)
     output_path = os.path.join(tempfile.gettempdir(), f"download_{uuid.uuid4().hex}.{actual_output_format}")
     
     # Build and execute command
     command = await imagemagick_service.build_command(
-        image.file_path,
+        validated_input_path,
         output_path,
         operations
     )

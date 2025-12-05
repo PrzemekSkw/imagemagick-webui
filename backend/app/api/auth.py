@@ -502,12 +502,7 @@ async def google_oauth_status():
     has_client_id = bool(settings.google_client_id)
     has_client_secret = bool(settings.google_client_secret)
     
-    logger.info(f"Google OAuth status check: client_id={has_client_id}, client_secret={has_client_secret}")
-    
-    if has_client_id:
-        # Log partial client ID for debugging (first 10 chars)
-        partial_id = settings.google_client_id[:10] + "..." if len(settings.google_client_id) > 10 else settings.google_client_id
-        logger.info(f"Google Client ID starts with: {partial_id}")
+    logger.debug(f"Google OAuth status check: configured={has_client_id and has_client_secret}")
     
     return {
         "enabled": has_client_id and has_client_secret,

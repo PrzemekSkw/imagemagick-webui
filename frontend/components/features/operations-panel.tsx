@@ -375,14 +375,14 @@ export function OperationsPanel() {
 
   return (
     <motion.div 
-      className="h-full flex flex-col bg-white rounded-2xl shadow-sm border border-gray-100"
+      className="h-full flex flex-col bg-card rounded-2xl shadow-sm border border-border"
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
     >
       {/* Header */}
-      <div className="p-4 border-b border-gray-100">
-        <h2 className="font-semibold text-gray-900">Quick Operations</h2>
-        <p className="text-sm text-gray-500 mt-1">
+      <div className="p-4 border-b border-border">
+        <h2 className="font-semibold text-foreground">Quick Operations</h2>
+        <p className="text-sm text-muted-foreground mt-1">
           {displaySelectedCount > 0 
             ? `${displaySelectedCount} image(s) selected` 
             : 'Select images to process'}
@@ -410,7 +410,7 @@ export function OperationsPanel() {
               <TabsContent value="dimensions" className="space-y-4 mt-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-xs text-gray-500">Width</Label>
+                    <Label className="text-xs text-muted-foreground">Width</Label>
                     <Input
                       type="number"
                       value={width}
@@ -419,7 +419,7 @@ export function OperationsPanel() {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs text-gray-500">Height</Label>
+                    <Label className="text-xs text-muted-foreground">Height</Label>
                     <Input
                       type="number"
                       value={height}
@@ -449,7 +449,7 @@ export function OperationsPanel() {
                 </Button>
 
                 <div>
-                  <Label className="text-xs text-gray-500">Fit Mode</Label>
+                  <Label className="text-xs text-muted-foreground">Fit Mode</Label>
                   <Select value={resizeFit} onValueChange={setResizeFit}>
                     <SelectTrigger className="mt-1">
                       <SelectValue />
@@ -464,7 +464,7 @@ export function OperationsPanel() {
 
                 {/* Quick presets */}
                 <div>
-                  <Label className="text-xs text-gray-500 mb-2 block">Quick Presets</Label>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Quick Presets</Label>
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { label: 'HD', w: 1280, h: 720 },
@@ -492,7 +492,7 @@ export function OperationsPanel() {
 
               <TabsContent value="percent" className="space-y-4 mt-4">
                 <div>
-                  <Label className="text-xs text-gray-500">Scale: {percent}%</Label>
+                  <Label className="text-xs text-muted-foreground">Scale: {percent}%</Label>
                   <Slider
                     value={[percent]}
                     onValueChange={([v]) => setPercent(v)}
@@ -522,7 +522,7 @@ export function OperationsPanel() {
           {/* Rotate Tab */}
           <TabsContent value="rotate" className="space-y-4 mt-4">
             <div>
-              <Label className="text-xs text-gray-500">Rotation: {rotation}°</Label>
+              <Label className="text-xs text-muted-foreground">Rotation: {rotation}°</Label>
               <Slider
                 value={[rotation]}
                 onValueChange={([v]) => setRotation(v)}
@@ -549,7 +549,7 @@ export function OperationsPanel() {
             </div>
 
             <div className="pt-2 border-t">
-              <Label className="text-xs text-gray-500 mb-2 block">Flip</Label>
+              <Label className="text-xs text-muted-foreground mb-2 block">Flip</Label>
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" size="sm" onClick={() => handleFlip('horizontal')} disabled={isProcessing}>
                   <FlipHorizontal className="h-4 w-4 mr-1" /> Horizontal
@@ -564,7 +564,7 @@ export function OperationsPanel() {
           {/* Watermark/Text Tab */}
           <TabsContent value="watermark" className="space-y-4 mt-4">
             <div>
-              <Label className="text-xs text-gray-500">Text</Label>
+              <Label className="text-xs text-muted-foreground">Text</Label>
               <Input
                 value={watermarkText}
                 onChange={(e) => setWatermarkText(e.target.value)}
@@ -574,8 +574,8 @@ export function OperationsPanel() {
             </div>
 
             <div>
-              <Label className="text-xs text-gray-500">Position</Label>
-              <div className="grid grid-cols-3 gap-1 mt-2 p-2 bg-gray-50 rounded-lg">
+              <Label className="text-xs text-muted-foreground">Position</Label>
+              <div className="grid grid-cols-3 gap-1 mt-2 p-2 bg-secondary rounded-lg">
                 {['northwest', 'north', 'northeast', 'west', 'center', 'east', 'southwest', 'south', 'southeast'].map((pos) => (
                   <Button
                     key={pos}
@@ -591,7 +591,7 @@ export function OperationsPanel() {
             </div>
 
             <div>
-              <Label className="text-xs text-gray-500">Font Size: {watermarkFontSize}pt</Label>
+              <Label className="text-xs text-muted-foreground">Font Size: {watermarkFontSize}pt</Label>
               <Slider
                 value={[watermarkFontSize]}
                 onValueChange={([v]) => setWatermarkFontSize(v)}
@@ -618,7 +618,7 @@ export function OperationsPanel() {
 
           {/* Terminal Tab */}
           <TabsContent value="advanced" className="space-y-4 mt-4">
-            <div className="rounded-lg overflow-hidden border border-gray-200">
+            <div className="rounded-lg overflow-hidden border border-border">
               <div className="bg-gray-900 text-white px-3 py-2 text-xs flex items-center gap-2">
                 <Terminal className="h-3 w-3" />
                 <span>ImageMagick Terminal</span>
@@ -639,14 +639,14 @@ export function OperationsPanel() {
               />
             </div>
 
-            <div className="text-xs text-gray-500 space-y-1">
-              <p>Use <code className="bg-gray-100 px-1 rounded">%input%</code> for input file</p>
-              <p>Use <code className="bg-gray-100 px-1 rounded">%output%</code> for output file</p>
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>Use <code className="bg-secondary px-1 rounded">%input%</code> for input file</p>
+              <p>Use <code className="bg-secondary px-1 rounded">%output%</code> for output file</p>
               <p className="text-amber-600">⚠️ Some commands are blocked for security</p>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs text-gray-500">Quick Commands</Label>
+              <Label className="text-xs text-muted-foreground">Quick Commands</Label>
               <div className="grid grid-cols-1 gap-1">
                 {[
                   { label: 'Grayscale', cmd: '-colorspace Gray' },
@@ -661,7 +661,7 @@ export function OperationsPanel() {
                     className="justify-start text-xs"
                     onClick={() => setRawCommand(item.cmd)}
                   >
-                    {item.label}: <code className="ml-1 text-gray-500">{item.cmd}</code>
+                    {item.label}: <code className="ml-1 text-muted-foreground">{item.cmd}</code>
                   </Button>
                 ))}
               </div>
@@ -669,9 +669,9 @@ export function OperationsPanel() {
           </TabsContent>
 
           {/* Output Format */}
-          <div className="mt-6 pt-4 border-t border-gray-100 space-y-4">
+          <div className="mt-6 pt-4 border-t border-border space-y-4">
             <div>
-              <Label className="text-xs text-gray-500">Output Format</Label>
+              <Label className="text-xs text-muted-foreground">Output Format</Label>
               <Select value={outputFormat} onValueChange={setOutputFormat}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
@@ -687,7 +687,7 @@ export function OperationsPanel() {
 
             {outputFormat !== 'png' && (
               <div>
-                <Label className="text-xs text-gray-500">Quality: {quality}%</Label>
+                <Label className="text-xs text-muted-foreground">Quality: {quality}%</Label>
                 <Slider
                   value={[quality]}
                   onValueChange={([v]) => setQuality(v)}
@@ -701,15 +701,15 @@ export function OperationsPanel() {
           </div>
 
           {/* Command Preview */}
-          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-            <Label className="text-xs text-gray-500 mb-1 block">Command Preview</Label>
-            <code className="text-xs text-gray-700 break-all block">{commandPreview}</code>
+          <div className="mt-4 p-3 bg-secondary rounded-lg">
+            <Label className="text-xs text-muted-foreground mb-1 block">Command Preview</Label>
+            <code className="text-xs text-foreground break-all block">{commandPreview}</code>
           </div>
         </Tabs>
       </ScrollArea>
 
       {/* Actions - only Apply button, no duplicate Download/Delete */}
-      <div className="p-4 border-t border-gray-100">
+      <div className="p-4 border-t border-border">
         <Button 
           className="w-full" 
           onClick={handleApply}

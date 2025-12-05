@@ -3,6 +3,8 @@ Images API endpoints for upload and management
 """
 
 import logging
+import shlex
+import os
 from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
@@ -24,6 +26,43 @@ from app.services.imagemagick import imagemagick_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# Security: Path validation
+ALLOWED_DIRS = [
+    os.path.realpath(settings.upload_dir),
+    os.path.realpath(settings.output_dir),
+    os.path.realpath(settings.temp_dir),
+    '/app/uploads',
+    '/app/processed',
+    '/tmp'
+]
+
+
+def validate_path(file_path: str) -> str:
+    """
+    Validate that a file path is within allowed directories.
+    Prevents path traversal attacks.
+    Returns the validated absolute path or raises HTTPException.
+    """
+    if not file_path:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    
+    # Resolve to absolute path
+    abs_path = os.path.realpath(file_path)
+    
+    # Check if path is within allowed directories
+    is_allowed = any(
+        abs_path.startswith(os.path.realpath(allowed_dir))
+        for allowed_dir in ALLOWED_DIRS
+        if allowed_dir and os.path.exists(os.path.dirname(allowed_dir) or '/')
+    )
+    
+    if not is_allowed:
+        logger.warning(f"Path traversal attempt blocked: {file_path} -> {abs_path}")
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    return abs_path
 
 
 # Response models
@@ -263,8 +302,15 @@ async def get_preview(
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
     
-    if not Path(image.file_path).exists():
+    # Validate path is within allowed directories
+    validated_path = validate_path(image.file_path)
+    
+    if not Path(validated_path).exists():
         raise HTTPException(status_code=404, detail="File not found")
+    
+    # Validate page is a non-negative integer
+    if page < 0 or page > 1000:
+        raise HTTPException(status_code=400, detail="Invalid page number")
     
     # Check if it's a PDF
     is_pdf = image.mime_type == 'application/pdf' or image.original_filename.lower().endswith('.pdf')
@@ -272,64 +318,67 @@ async def get_preview(
     if not is_pdf:
         # Return original image
         return FileResponse(
-            image.file_path,
+            validated_path,
             media_type=image.mime_type,
             filename=image.original_filename
         )
     
     # For PDF, generate preview
-    import os
-    import tempfile
     import asyncio
     
-    preview_dir = Path(image.file_path).parent / "previews"
+    preview_dir = Path(validated_path).parent / "previews"
     preview_dir.mkdir(parents=True, exist_ok=True)
     
-    preview_filename = f"{Path(image.file_path).stem}_page{page}.png"
+    preview_filename = f"{Path(validated_path).stem}_page{page}.png"
     preview_path = preview_dir / preview_filename
     
+    # Validate preview path
+    validated_preview = validate_path(str(preview_path))
+    
     # Check if preview already exists
-    if preview_path.exists():
+    if Path(validated_preview).exists():
         return FileResponse(
-            str(preview_path),
+            validated_preview,
             media_type="image/png",
             filename=preview_filename
         )
     
-    # Generate preview using pdftoppm
-    temp_base = str(preview_path).replace('.png', '')
-    pdftoppm_cmd = f'pdftoppm -png -f {page + 1} -l {page + 1} -r 150 -singlefile "{image.file_path}" "{temp_base}"'
+    # Generate preview using pdftoppm with safe path quoting
+    temp_base = validated_preview.replace('.png', '')
+    safe_input = shlex.quote(validated_path)
+    safe_output = shlex.quote(temp_base)
+    pdftoppm_cmd = ['pdftoppm', '-png', '-f', str(page + 1), '-l', str(page + 1), '-r', '150', '-singlefile', validated_path, temp_base]
     
     try:
-        process = await asyncio.create_subprocess_shell(
-            pdftoppm_cmd,
+        process = await asyncio.create_subprocess_exec(
+            *pdftoppm_cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
         
-        if process.returncode == 0 and preview_path.exists():
+        if process.returncode == 0 and Path(validated_preview).exists():
             return FileResponse(
-                str(preview_path),
+                validated_preview,
                 media_type="image/png",
                 filename=preview_filename
             )
     except Exception as e:
         logger.exception(f"PDF preview generation failed: {e}")
     
-    # Fallback to ImageMagick
+    # Fallback to ImageMagick with safe arguments
     try:
-        magick_cmd = f'magick -density 150 "{image.file_path}[{page}]" -background white -alpha remove -quality 90 "{preview_path}"'
-        process = await asyncio.create_subprocess_shell(
-            magick_cmd,
+        magick_cmd = ['magick', '-density', '150', f'{validated_path}[{page}]', '-background', 'white', '-alpha', 'remove', '-quality', '90', validated_preview]
+        process = await asyncio.create_subprocess_exec(
+            *magick_cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
         
-        if process.returncode == 0 and preview_path.exists():
+        if process.returncode == 0 and Path(validated_preview).exists():
             return FileResponse(
-                str(preview_path),
+                validated_preview,
                 media_type="image/png",
                 filename=preview_filename
             )
