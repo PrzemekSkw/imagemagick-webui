@@ -1,0 +1,58 @@
+# Git
+.git
+.gitignore
+
+# Node
+node_modules
+.next
+.npm
+npm-debug.log*
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+.Python
+venv
+.venv
+*.egg-info
+.pytest_cache
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+dist
+build
+*.egg
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+docs
+*.md
+!README.md
+
+# Tests
+tests
+*_test.py
+test_*
+coverage
+.coverage
+htmlcov
+
+# Misc
+*.log
+*.tmp
+tmp
+temp

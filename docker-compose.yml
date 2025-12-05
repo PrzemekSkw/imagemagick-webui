@@ -1,0 +1,86 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - DATABASE_URL=postgresql+asyncpg://imagemagick:imagemagick@postgres:5432/imagemagick
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-supersecretkey_change_in_production_2024}
+      - JWT_SECRET=${JWT_SECRET:-jwt_secret_key_change_this_in_production}
+      - REQUIRE_LOGIN=${REQUIRE_LOGIN:-false}
+      - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-true}
+      - DEFAULT_OUTPUT_FORMAT=${DEFAULT_OUTPUT_FORMAT:-webp}
+      - DEFAULT_QUALITY=${DEFAULT_QUALITY:-85}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-100}
+      - IMAGEMAGICK_TIMEOUT=${IMAGEMAGICK_TIMEOUT:-30}
+      - IMAGEMAGICK_MEMORY_LIMIT=${IMAGEMAGICK_MEMORY_LIMIT:-2GB}
+      - HISTORY_RETENTION_HOURS=${HISTORY_RETENTION_HOURS:-24}
+      - TZ=UTC
+    volumes:
+      - uploads:/app/uploads
+      - processed:/app/processed
+      - temp:/tmp/imagemagick
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2'
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=imagemagick
+      - POSTGRES_PASSWORD=imagemagick
+      - POSTGRES_DB=imagemagick
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U imagemagick"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:
+  processed:
+  temp:
+
+networks:
+  default:
+    driver: bridge

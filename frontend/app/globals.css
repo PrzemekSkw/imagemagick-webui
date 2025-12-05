@@ -1,0 +1,205 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 92%;
+    --input: 0 0% 92%;
+    --ring: 0 0% 9%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 0 0% 80%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Notion-style smooth scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/30;
+  }
+  
+  /* Selection color */
+  ::selection {
+    @apply bg-primary/10;
+  }
+}
+
+@layer components {
+  /* Notion-style hover effect */
+  .notion-hover {
+    @apply transition-colors duration-150 hover:bg-secondary/80 rounded-lg;
+  }
+  
+  /* Notion-style card */
+  .notion-card {
+    @apply bg-card rounded-xl border border-border shadow-notion transition-shadow duration-200 hover:shadow-notion-md;
+  }
+  
+  /* Notion-style button */
+  .notion-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150;
+    @apply hover:bg-secondary/80 active:scale-[0.98];
+  }
+  
+  /* Ultra-clean input */
+  .notion-input {
+    @apply w-full rounded-lg border border-border bg-background px-3 py-2 text-sm;
+    @apply placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/20 focus:border-ring/40;
+    @apply transition-all duration-150;
+  }
+  
+  /* Sidebar item */
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground;
+    @apply transition-all duration-150 cursor-pointer;
+    @apply hover:bg-secondary hover:text-foreground;
+  }
+  
+  .sidebar-item.active {
+    @apply bg-secondary text-foreground;
+  }
+  
+  /* Upload zone */
+  .upload-zone {
+    @apply border-2 border-dashed border-border rounded-2xl p-12;
+    @apply transition-all duration-200 cursor-pointer;
+    @apply hover:border-primary/40 hover:bg-secondary/50;
+  }
+  
+  .upload-zone.dragging {
+    @apply border-primary bg-primary/5 scale-[1.01];
+  }
+  
+  /* Image thumbnail */
+  .image-thumbnail {
+    @apply relative aspect-square rounded-xl overflow-hidden bg-secondary;
+    @apply transition-all duration-200 cursor-pointer;
+    @apply hover:ring-2 hover:ring-primary/20 hover:shadow-notion-md;
+  }
+  
+  .image-thumbnail.selected {
+    @apply ring-2 ring-primary shadow-notion-md;
+  }
+  
+  /* Progress bar */
+  .progress-bar {
+    @apply h-1.5 bg-secondary rounded-full overflow-hidden;
+  }
+  
+  .progress-bar-fill {
+    @apply h-full bg-primary rounded-full transition-all duration-300 ease-out;
+  }
+  
+  /* Command preview */
+  .command-preview {
+    @apply font-mono text-xs bg-secondary/50 rounded-lg p-4 overflow-x-auto;
+    @apply border border-border;
+  }
+  
+  /* Slider track */
+  .slider-track {
+    @apply relative h-1.5 w-full grow overflow-hidden rounded-full bg-secondary;
+  }
+  
+  /* Dialog backdrop */
+  .dialog-backdrop {
+    @apply fixed inset-0 z-50 bg-black/50 backdrop-blur-sm;
+    @apply animate-in fade-in-0;
+  }
+  
+  /* Toast */
+  .toast {
+    @apply bg-card border border-border rounded-xl shadow-notion-lg p-4;
+    @apply animate-in slide-in-from-bottom-2 fade-in-0;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Shimmer effect for loading */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--secondary)) 0%,
+      hsl(var(--muted)) 50%,
+      hsl(var(--secondary)) 100%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+  
+  /* Glass effect */
+  .glass {
+    @apply bg-background/80 backdrop-blur-xl;
+  }
+}
