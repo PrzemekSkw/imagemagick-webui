@@ -1,217 +1,206 @@
-# 🎨 ImageMagick WebGUI
+# 🖼️ ImageMagick WebGUI
 
-Beautiful, powerful image processing in your browser. A production-ready web application for processing images using ImageMagick with a stunning, Notion-inspired user interface.
+<div align="center">
 
-![ImageMagick WebGUI](https://img.shields.io/badge/ImageMagick-WebGUI-black?style=for-the-badge)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)
-![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)
+![ImageMagick WebGUI](https://img.shields.io/badge/ImageMagick-WebGUI-blue?style=for-the-badge)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-Python-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+
+**A modern, beautiful web interface for ImageMagick with AI-powered features**
+
+[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Screenshots](#-screenshots) • [Contributing](#-contributing)
+
+</div>
+
+---
 
 ## ✨ Features
 
-### 🖼️ Image Processing
-- **Resize & Crop**: Scale images by dimensions or percentage, with aspect ratio preservation
-- **Format Conversion**: Convert between WebP, AVIF, JPEG, PNG, GIF, and more
-- **Quality Control**: Fine-tune compression with quality slider (1-100%)
-- **Filters & Effects**: Blur, sharpen, grayscale, sepia, brightness/contrast, saturation
-- **Watermarking**: Add text overlays with customizable positioning
-- **Rotate & Flip**: Transform orientation with preset or custom angles
-- **Auto-Enhance**: One-click image enhancement using ImageMagick's auto-orient, enhance, and auto-level
+### 🎨 Image Processing
+- **Resize & Crop** - Precise dimensions, percentage scaling, aspect ratio lock
+- **Format Conversion** - WebP, AVIF, JPEG, PNG, GIF, TIFF, PDF support
+- **Filters & Effects** - Blur, Sharpen, Grayscale, Sepia, Brightness, Contrast, Saturation
+- **Watermark & Text** - Custom text overlays with position, opacity, and font size control
+- **Rotate & Flip** - 90°, 180°, 270° rotation with horizontal/vertical flip
+- **Batch Processing** - Process multiple images simultaneously
 
-### 🎯 User Interface
-- **Ultra-clean design** inspired by Notion and modern design systems
-- **Drag & drop** file upload with progress indicator
-- **Beautiful gallery** with thumbnails and multi-select
-- **Real-time command preview** showing exact ImageMagick commands
-- **Terminal mode** for advanced users (Monaco editor with raw commands)
-- **Dark/Light/System** theme support
-- **Fully responsive** design for mobile and tablet
-- **PWA support** - installable on desktop and mobile
+### 🤖 AI-Powered Features
+- **Background Removal** - One-click AI background removal using rembg
+- **Auto Enhance** - Automatic image enhancement (normalize, saturation, sharpening)
+- **Smart Upscaling** - 2x/4x resolution upscaling with LANCZOS algorithm
 
-### 🔒 Security
-- **Whitelist-based** command validation
-- **Path traversal protection**
-- **Shell injection prevention**
-- **Resource limits** (memory, CPU, timeout)
-- **Rate limiting** for API endpoints
-- **JWT authentication**
+### 🖥️ User Interface
+- **Notion-inspired Design** - Ultra-clean, minimalist white interface
+- **Real-time Preview** - See changes before applying
+- **Drag & Drop Upload** - Easy multi-file upload
+- **Image Editor** - Full-featured editor with live preview
+- **Terminal Mode** - Direct ImageMagick command input for power users
+- **Dark/Light Mode** - Automatic or manual theme switching
+- **PWA Support** - Install as desktop/mobile app
 
-### ⚡ Performance
-- **Background job processing** with Redis Queue
-- **Progress tracking** for long-running operations
-- **Batch processing** for multiple images
-- **Optimized Docker image** (~250MB)
-- **Auto cleanup** of temporary files
+### 🔧 Technical
+- **Docker Ready** - One command deployment
+- **Type-Safe** - Full TypeScript + Pydantic validation
+- **Secure** - Command whitelist, timeouts, resource limits
+- **Queue System** - Redis-based job queue for heavy operations
+- **History** - Track all processed images with re-download option
+
+---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose installed
-- At least 4GB of RAM available
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
 
-### One-Command Deployment
+### One-Command Start
 
 ```bash
-# Clone and start
-git clone <repository-url>
-cd imagemagick-webgui
+git clone https://github.com/przemekskw/imagemagick-webui.git
+cd imagemagick-webui
 docker compose up --build
 ```
 
-That's it! The application will be available at:
-- **Frontend**: http://localhost:3000
-- **API Documentation**: http://localhost:8000/docs
+**That's it!** Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Environment Variables (Optional)
+### Default Ports
+| Service | Port | Description |
+|---------|------|-------------|
+| Frontend | 3000 | Next.js web interface |
+| Backend | 8000 | FastAPI REST API |
+| PostgreSQL | 5432 | Database |
+| Redis | 6379 | Queue system |
 
-Create a `.env` file to customize settings:
+---
+
+## 📖 Documentation
+
+### Configuration
+
+Create a `.env` file in the project root (optional):
 
 ```env
-# Security (change in production!)
-SECRET_KEY=your-super-secret-key-change-this
-JWT_SECRET=your-jwt-secret-key-change-this
+# Database
+DATABASE_URL=postgresql+asyncpg://imagemagick:imagemagick@db:5432/imagemagick
 
-# Require login to use the app
-REQUIRE_LOGIN=false
+# Security
+SECRET_KEY=your-secret-key-change-in-production
+ACCESS_TOKEN_EXPIRE_MINUTES=60
 
-# Allow new user registration (set to false to disable signups)
-ALLOW_REGISTRATION=true
-
-# Google OAuth (optional - see setup instructions below)
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-
-# Limits
-MAX_UPLOAD_SIZE_MB=100
-IMAGEMAGICK_TIMEOUT=30
+# ImageMagick limits
+IMAGEMAGICK_TIMEOUT=60
 IMAGEMAGICK_MEMORY_LIMIT=2GB
+MAX_UPLOAD_SIZE=50MB
+
+# Optional: Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 ```
 
-### Google OAuth Setup (Optional)
+### API Documentation
 
-To enable "Sign in with Google":
+Once running, access the interactive API docs:
+- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-1. **Create Google Cloud Project**
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select existing one
+### Architecture
 
-2. **Enable OAuth APIs**
-   - Go to "APIs & Services" > "Enabled APIs"
-   - Enable "Google+ API" and "Google Identity"
+```
+┌─────────────────┐     ┌─────────────────┐
+│   Next.js 15    │────▶│    FastAPI      │
+│   (Frontend)    │     │   (Backend)     │
+│   Port: 3000    │     │   Port: 8000    │
+└─────────────────┘     └────────┬────────┘
+                                 │
+                    ┌────────────┴────────────┐
+                    │                         │
+              ┌─────▼─────┐           ┌───────▼───────┐
+              │ PostgreSQL│           │     Redis     │
+              │   (DB)    │           │   (Queue)     │
+              │ Port: 5432│           │  Port: 6379   │
+              └───────────┘           └───────────────┘
+                                              │
+                                      ┌───────▼───────┐
+                                      │  RQ Worker    │
+                                      │ (Background)  │
+                                      └───────────────┘
+```
 
-3. **Create OAuth Credentials**
-   - Go to "APIs & Services" > "Credentials"
-   - Click "Create Credentials" > "OAuth client ID"
-   - Select "Web application"
-   - Add authorized JavaScript origins:
-     ```
-     http://localhost:3000
-     https://yourdomain.com
-     ```
-   - Add authorized redirect URIs:
-     ```
-     http://localhost:3000/api/auth/google/callback
-     https://yourdomain.com/api/auth/google/callback
-     ```
-   - Copy Client ID and Client Secret
+### Supported Operations
 
-4. **Configure Environment**
-   ```env
-   GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-   GOOGLE_CLIENT_SECRET=your-client-secret
-   ```
+| Operation | Parameters | Example |
+|-----------|------------|---------|
+| `resize` | `width`, `height`, `percent`, `fit` | `{"width": 800, "height": 600}` |
+| `crop` | `x`, `y`, `width`, `height` | `{"x": 0, "y": 0, "width": 500, "height": 500}` |
+| `rotate` | `degrees` | `{"degrees": 90}` |
+| `flip` | `direction` | `{"direction": "horizontal"}` |
+| `blur` | `sigma` | `{"sigma": 10}` |
+| `sharpen` | `sigma` | `{"sigma": 2}` |
+| `brightness` | `value` | `{"value": 120}` |
+| `contrast` | `value` | `{"value": 110}` |
+| `saturation` | `value` | `{"value": 130}` |
+| `grayscale` | - | `{}` |
+| `sepia-tone` | `threshold` | `{"threshold": 80}` |
+| `watermark` | `text`, `position`, `font_size`, `opacity` | `{"text": "©2024", "position": "southeast"}` |
+| `format` | `format`, `quality` | `{"format": "webp", "quality": 85}` |
 
-5. **Restart Application**
-   ```bash
-   docker compose down
-   docker compose up --build
-   ```
+### Terminal Mode Commands
 
-The "Continue with Google" button will automatically appear when OAuth is configured.
-
-## 📖 Usage Guide
-
-### Basic Workflow
-
-1. **Upload Images**
-   - Drag & drop files onto the upload zone
-   - Or click to browse and select files
-   - Supports: JPG, PNG, WebP, GIF, SVG, TIFF, PDF, HEIC, AVIF
-
-2. **Select Images**
-   - Click thumbnails to select/deselect
-   - Use "Select All" for batch operations
-   - Multi-select with checkboxes
-
-3. **Choose Operations**
-   - Use the sidebar to navigate operation categories
-   - Configure parameters for each operation
-   - Add multiple operations to build a pipeline
-
-4. **Preview & Execute**
-   - View the exact ImageMagick command before execution
-   - Click "Apply to X image(s)" to process
-   - Download results as ZIP
-
-### Advanced: Terminal Mode
-
-For power users, Terminal Mode provides direct access to ImageMagick:
+For advanced users, use Terminal Mode to run raw ImageMagick commands:
 
 ```bash
-# Example commands (use {input} and {output} as placeholders)
--resize 50% -quality 80
--blur 0x5 -modulate 110,120,100
--colorspace Gray -contrast
+# Convert to WebP with quality
+magick input.jpg -quality 80 output.webp
+
+# Create thumbnail
+magick input.jpg -thumbnail 300x300 output.jpg
+
+# Add border
+magick input.jpg -border 10x10 -bordercolor "#ff0000" output.jpg
+
+# Composite images
+magick base.jpg overlay.png -composite output.jpg
 ```
 
-## 🏗️ Architecture
+---
 
-```
-imagemagick-webgui/
-├── docker-compose.yml      # Service orchestration
-├── Dockerfile              # Multi-stage build
-├── frontend/               # Next.js 15 + TypeScript
-│   ├── app/               # App Router pages
-│   ├── components/        # React components
-│   │   ├── ui/           # shadcn/ui components
-│   │   ├── layout/       # Layout components
-│   │   └── features/     # Feature components
-│   └── lib/              # Utilities, API client, store
-├── backend/               # FastAPI + Python
-│   ├── app/
-│   │   ├── api/          # API endpoints
-│   │   ├── core/         # Config, database, security
-│   │   ├── models/       # SQLAlchemy models
-│   │   ├── services/     # Business logic
-│   │   └── workers/      # Background tasks
-│   └── tests/            # Pytest tests
-└── scripts/              # Startup scripts
-```
+## 📸 Screenshots
 
-### Tech Stack
+<details>
+<summary>Click to view screenshots</summary>
 
-| Component | Technology |
-|-----------|------------|
-| Frontend | Next.js 15, TypeScript, Tailwind CSS, shadcn/ui, Zustand |
-| Backend | FastAPI, SQLAlchemy, Pydantic |
-| Queue | Redis + RQ (Redis Queue) |
-| Database | PostgreSQL |
-| Image Processing | ImageMagick 7 |
-| Containerization | Docker, multi-stage builds |
+### Dashboard
+![Dashboard](docs/screenshots/dashboard.png)
 
-## 🔧 Development
+### Image Editor
+![Editor](docs/screenshots/editor.png)
 
-### Local Development
+### Batch Processing
+![Batch](docs/screenshots/batch.png)
 
+### Terminal Mode
+![Terminal](docs/screenshots/terminal.png)
+
+</details>
+
+---
+
+## 🛠️ Development
+
+### Local Development (without Docker)
+
+**Backend:**
 ```bash
-# Backend
 cd backend
 python -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8000
+```
 
-# Frontend
+**Frontend:**
+```bash
 cd frontend
 npm install
 npm run dev
@@ -222,70 +211,84 @@ npm run dev
 ```bash
 # Backend tests
 cd backend
-pytest -v
+pytest
 
-# Frontend (if tests added)
+# Frontend tests
 cd frontend
 npm test
 ```
 
-## 📚 API Reference
+### Project Structure
 
-### Authentication
-- `POST /api/auth/register` - Create new account
-- `POST /api/auth/login` - Login and get JWT
-- `GET /api/auth/me` - Get current user
+```
+imagemagick-webui/
+├── backend/
+│   ├── app/
+│   │   ├── api/          # API endpoints
+│   │   ├── core/         # Config, security, database
+│   │   ├── models/       # SQLAlchemy models
+│   │   ├── services/     # Business logic
+│   │   └── workers/      # Background tasks
+│   ├── tests/
+│   └── requirements.txt
+├── frontend/
+│   ├── app/              # Next.js App Router pages
+│   ├── components/       # React components
+│   │   ├── features/     # Feature components
+│   │   ├── layout/       # Layout components
+│   │   └── ui/           # UI primitives (shadcn/ui)
+│   └── lib/              # Utilities, API client, store
+├── docker-compose.yml
+├── Dockerfile
+└── README.md
+```
 
-### Images
-- `POST /api/images/upload` - Upload images (multipart)
-- `GET /api/images` - List uploaded images
-- `GET /api/images/{id}` - Get image file
-- `GET /api/images/{id}/thumbnail` - Get thumbnail
-- `DELETE /api/images/{id}` - Delete image
+---
 
-### Operations
-- `POST /api/operations/process` - Process images
-- `POST /api/operations/raw` - Process with raw command
-- `POST /api/operations/preview-command` - Preview command
-- `GET /api/operations/available` - List operations
+## 🔒 Security
 
-### Queue
-- `GET /api/queue/stats` - Queue statistics
-- `GET /api/queue/jobs` - List jobs
-- `GET /api/queue/jobs/{id}` - Job details
-- `GET /api/queue/jobs/{id}/download` - Download results
+- **Command Whitelist** - Only allowed ImageMagick operations
+- **Input Validation** - Pydantic models for all inputs
+- **Resource Limits** - Memory (2GB), timeout (60s), disk limits
+- **File Validation** - MIME type and extension checking
+- **Rate Limiting** - Configurable request limits
+- **Non-root Container** - Runs as unprivileged user
 
-Full API documentation available at `/docs` (Swagger UI) or `/redoc`.
-
-## 🔐 Security Considerations
-
-### Production Deployment
-
-1. **Change all secrets** in environment variables
-2. **Enable HTTPS** with a reverse proxy (nginx, traefik)
-3. **Configure CORS** for your domain
-4. **Set up proper backup** for PostgreSQL
-5. **Monitor resource usage** and adjust limits
-
-### Rate Limiting
-
-Default limits:
-- 100 requests/minute per IP
-- 100MB max file size
-- 30s timeout per ImageMagick operation
-- 2GB memory limit per operation
-
-## 📄 License
-
-MIT License - see LICENSE file for details.
+---
 
 ## 🤝 Contributing
 
-Contributions welcome! Please read our contributing guidelines first.
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
 
 ## 🙏 Acknowledgments
 
 - [ImageMagick](https://imagemagick.org/) - The powerful image processing library
+- [rembg](https://github.com/danielgatis/rembg) - AI background removal
+- [Next.js](https://nextjs.org/) - React framework
+- [FastAPI](https://fastapi.tiangolo.com/) - Python web framework
 - [shadcn/ui](https://ui.shadcn.com/) - Beautiful UI components
-- [Next.js](https://nextjs.org/) - The React framework
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS
+
+---
+
+<div align="center">
+
+**[⬆ Back to Top](#-imagemagick-webgui)**
+
+Made with ❤️ by [przemekskw](https://github.com/przemekskw)
+
+</div>
