@@ -176,11 +176,17 @@ magick base.jpg overlay.png -composite output.jpg
 ### Image Editor
 ![Editor](docs/screenshots/editor.png)
 
-### Batch Processing
-![Batch](docs/screenshots/batch.png)
+### Dark Mode
+![Dark Mode](docs/screenshots/darkmode.png)
 
-### Terminal Mode
-![Terminal](docs/screenshots/terminal.png)
+### Login
+![Login Screen](docs/screenshots/login.png)
+
+### Register
+![Register Screen](docs/screenshots/register.png)
+
+### Settings
+![Settings Screen](docs/screenshots/settings.png)
 
 </details>
 
