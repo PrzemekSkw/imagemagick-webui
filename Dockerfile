@@ -19,7 +19,7 @@ RUN npm run build
 # ============================================
 # STAGE 2: Python Dependencies
 # ============================================
-FROM python:3.12-slim AS python-deps
+FROM python:3.14-slim AS python-deps
 
 WORKDIR /app
 
@@ -42,7 +42,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ============================================
 # STAGE 3: Final Production Image
 # ============================================
-FROM python:3.12-slim AS production
+FROM python:3.14-slim AS production
 
 LABEL maintainer="ImageMagick WebGUI"
 LABEL description="Production-ready ImageMagick WebGUI application"
