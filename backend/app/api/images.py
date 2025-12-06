@@ -308,9 +308,14 @@ async def get_preview(
     if not Path(validated_path).exists():
         raise HTTPException(status_code=404, detail="File not found")
     
-    # Validate page is a non-negative integer
-    if page < 0 or page > 1000:
+    # Validate page is a non-negative integer and strictly int-typed
+    try:
+        page_int = int(page)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Page must be an integer")
+    if page_int < 0 or page_int > 1000:
         raise HTTPException(status_code=400, detail="Invalid page number")
+    page = page_int
     
     # Check if it's a PDF
     is_pdf = image.mime_type == 'application/pdf' or image.original_filename.lower().endswith('.pdf')
@@ -337,7 +342,14 @@ async def get_preview(
     
     # Validate preview path: must be inside preview_dir
     preview_path_abs = preview_path.resolve()
-    if not str(preview_path_abs).startswith(str(preview_dir.resolve())):
+    # Use os.path.commonpath for robust path containment check
+    preview_dir_abs = preview_dir.resolve()
+    try:
+        common = os.path.commonpath([str(preview_path_abs), str(preview_dir_abs)])
+    except ValueError:
+        logger.warning(f"Preview path traversal attempt (invalid path): {preview_path} -> {preview_path_abs}")
+        raise HTTPException(status_code=403, detail="Access to preview denied.")
+    if common != str(preview_dir_abs):
         logger.warning(f"Preview path traversal attempt blocked: {preview_path} -> {preview_path_abs}")
         raise HTTPException(status_code=403, detail="Access to preview denied.")
     
