@@ -31,7 +31,7 @@ router = APIRouter()
 # Security: Path validation
 ALLOWED_DIRS = [
     os.path.realpath(settings.upload_dir),
-    os.path.realpath(settings.output_dir),
+    os.path.realpath(settings.processed_dir),
     os.path.realpath(settings.temp_dir),
     '/app/uploads',
     '/app/processed',
