@@ -16,9 +16,9 @@
 
 ## 📽️  Video
 
-<video src="https://raw.githubusercontent.com/PrzemekSkw/imagemagick-webui/main/docs/media/imagemagick.mp4" controls="controls" style="max-width: 100%">
-  Twoja przeglądarka nie obsługuje tagu video.
-</video>
+<a href="https://github.com/PrzemekSkw/imagemagick-webui/blob/main/docs/media/imagemagick.mp4" target="_blank">
+ <img src="https://raw.githubusercontent.com/PrzemekSkw/imagemagick-webui/main/docs/media/thumbnail.png" alt="Obejrzyj wideo" style="max-width:100%;">
+</a>
 
 ---
 
