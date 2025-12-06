@@ -14,6 +14,10 @@
 
 </div>
 
+## 📽️  Video
+
+https://github.com/PrzemekSkw/imagemagick-webui/blob/main/docs/media/imagemagick.mp4
+
 ---
 
 ## ✨ Features
