@@ -62,7 +62,8 @@ https://github.com/user-attachments/assets/53538ac9-8642-4c9b-972f-772c17efa9fa
 
 ```bash
 git clone https://github.com/przemekskw/imagemagick-webui.git
-cd imagemagick-webui
+cd imagemagick-webui\
+cp .env.example .env
 docker compose up --build
 ```
 
