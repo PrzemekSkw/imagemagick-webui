@@ -502,8 +502,6 @@ async def google_oauth_status():
     has_client_id = bool(settings.google_client_id)
     has_client_secret = bool(settings.google_client_secret)
     
-    logger.debug(f"Google OAuth status check: configured={has_client_id and has_client_secret}")
-    
     return {
         "enabled": has_client_id and has_client_secret,
     }
