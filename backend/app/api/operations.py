@@ -1035,17 +1035,26 @@ async def download_direct(
     
     # Use temp directory for output (already in allowed dirs)
     output_path = os.path.join(tempfile.gettempdir(), f"download_{uuid.uuid4().hex}.{actual_output_format}")
+    # Security: Ensure normalized output_path stays within tempdir
+    normalized_output_path = os.path.normpath(output_path)
+    tempdir = os.path.normpath(tempfile.gettempdir())
+    if not normalized_output_path.startswith(tempdir):
+        raise HTTPException(
+            status_code=400, 
+            detail="Invalid output path generated"
+        )
     
+    # Now use normalized_output_path below
     # Build and execute command
     command = await imagemagick_service.build_command(
         validated_input_path,
-        output_path,
+        normalized_output_path,
         operations
     )
     
     success, stdout, stderr = await imagemagick_service.execute(command)
     
-    if not success or not Path(output_path).exists():
+    if not success or not Path(normalized_output_path).exists():
         raise HTTPException(status_code=500, detail=f"Processing failed: {stderr}")
     
     # Get MIME type
@@ -1060,7 +1069,7 @@ async def download_direct(
     
     # Return file for download
     return FileResponse(
-        path=output_path,
+        path=normalized_output_path,
         filename=output_filename,
         media_type=media_type,
         headers={
