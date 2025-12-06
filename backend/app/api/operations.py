@@ -1019,7 +1019,12 @@ async def download_direct(
     operations = [op.model_dump() for op in request.operations]
     
     # For PDF input, force image output since ImageMagick rasterizes PDFs
-    actual_output_format = request.output_format
+    allowed_formats = {"webp", "png", "jpg", "jpeg", "gif"}
+    # Validate and sanitize output_format
+    requested_format = request.output_format.lower().strip()
+    if requested_format not in allowed_formats:
+        raise HTTPException(status_code=400, detail="Invalid output format")
+    actual_output_format = requested_format
     is_pdf_input = validated_input_path.lower().endswith('.pdf') or (image.mime_type and 'pdf' in image.mime_type.lower())
     if is_pdf_input:
         actual_output_format = 'png'  # PDF is rasterized, output as PNG
