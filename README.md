@@ -176,17 +176,11 @@ magick base.jpg overlay.png -composite output.jpg
 ### Image Editor
 ![Editor](docs/screenshots/editor.png)
 
-### Dark Mode
-![Dark Mode](docs/screenshots/darkmode.png)
+### Batch Processing
+![Batch](docs/screenshots/batch.png)
 
-### Login
-![Login Screen](docs/screenshots/login.png)
-
-### Register
-![Register Screen](docs/screenshots/register.png)
-
-### Settings
-![Settings Screen](docs/screenshots/settings.png)
+### Terminal Mode
+![Terminal](docs/screenshots/terminal.png)
 
 </details>
 
@@ -280,6 +274,34 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
+## 💖 Support
+
+If you find this project useful, you can support its development:
+
+**Support via BuyMeACoffee:**
+
+[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://www.buymeacoffee.com/przemekskw)
+
+**Support via PayPal:**
+
+[![PayPal](https://img.shields.io/badge/PayPal-Donate-blue.svg)](https://paypal.me/przemekskw)
+
+**Support via GitHub Sponsors:**
+
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/PrzemekSkw?style=for-the-badge&logo=github&color=ea4aaa)](https://github.com/sponsors/PrzemekSkw)
+
+Your support helps maintain and improve this project. Thank you! ❤️
+
+---
+
+## ⭐ Star on GitHub
+
+If you find this project useful, please consider giving it a star on GitHub!
+
+[![Star History Chart](https://api.star-history.com/svg?repos=PrzemekSkw/imagemagick-webui&type=Date)](https://star-history.com/#PrzemekSkw/imagemagick-webui&Date)
+
+---
+
 ## 🙏 Acknowledgments
 
 - [ImageMagick](https://imagemagick.org/) - The powerful image processing library
@@ -293,8 +315,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**[⬆ Back to Top](#-imagemagick-webgui)**
 
-Made with ❤️ by [przemekskw](https://github.com/przemekskw)
+Made with ❤️ by [PrzemekSkw](https://github.com/PrzemekSkw)
 
 </div>
