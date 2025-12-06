@@ -1,7 +1,7 @@
 # ============================================
 # STAGE 1: Frontend Builder
 # ============================================
-FROM node:25-alpine AS frontend-builder
+FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -18,8 +18,9 @@ RUN npm run build
 
 # ============================================
 # STAGE 2: Python Dependencies
+# IMPORTANT: Pin to Python 3.12 - onnxruntime doesn't support 3.13+ yet
 # ============================================
-FROM python:3.14-slim AS python-deps
+FROM python:3.12.7-slim AS python-deps
 
 WORKDIR /app
 
@@ -41,8 +42,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # ============================================
 # STAGE 3: Final Production Image
+# IMPORTANT: Must match Python version from stage 2
 # ============================================
-FROM python:3.14-slim AS production
+FROM python:3.12.7-slim AS production
 
 LABEL maintainer="ImageMagick WebGUI"
 LABEL description="Production-ready ImageMagick WebGUI application"

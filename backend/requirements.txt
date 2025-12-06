@@ -15,7 +15,7 @@ psycopg2-binary>=2.9.9,<3.0.0
 alembic>=1.13.0,<2.0.0
 
 # Redis and task queue
-redis>=5.0.0,<8.0.0
+redis>=5.0.0,<6.0.0
 rq>=1.16.0,<2.0.0
 
 # Validation and serialization
@@ -27,22 +27,24 @@ email-validator>=2.1.0,<3.0.0
 Wand>=0.6.13,<1.0.0
 
 # File handling
-aiofiles>=23.2.0,<26.0.0
+aiofiles>=23.2.0,<24.0.0
 python-magic>=0.4.27,<1.0.0
-Pillow>=10.2.0,<13.0.0
+# IMPORTANT: Pillow 12 requires Python 3.14, pin to 11.x for Python 3.12
+Pillow>=10.2.0,<12.0.0
 
 # AI Background Removal
-rembg>=2.0.50,<3.0.0
-onnxruntime>=1.16.0,<2.0.0
+# IMPORTANT: rembg 2.0.62+ requires Python 3.10-3.13, onnxruntime needs Python <=3.12
+rembg>=2.0.50,<2.0.62
+onnxruntime>=1.16.0,<1.20.0
 pymatting>=1.1.8,<2.0.0
 scipy>=1.11.0,<2.0.0
 
 # Security
 slowapi>=0.1.9,<1.0.0
-limits>=3.7.0,<6.0.0
+limits>=3.7.0,<4.0.0
 
 # Testing (compatible versions)
-pytest>=7.4.0,<10.0.0
+pytest>=7.4.0,<8.0.0
 pytest-asyncio>=0.23.0,<0.24.0
 
 # Utilities
