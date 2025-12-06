@@ -16,9 +16,7 @@
 
 ## 📽️  Video
 
-<a href="https://github.com/PrzemekSkw/imagemagick-webui/blob/main/docs/media/imagemagick.mp4" target="_blank">
- <img src="https://raw.githubusercontent.com/PrzemekSkw/imagemagick-webui/main/docs/media/thumbnail.png" alt="Obejrzyj wideo" style="max-width:100%;">
-</a>
+https://github.com/user-attachments/assets/53538ac9-8642-4c9b-972f-772c17efa9fa
 
 ---
 
