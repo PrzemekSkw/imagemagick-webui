@@ -1,4 +1,10 @@
-# 🖼️ ImageMagick WebGUI
+<div align="center">
+
+<img src="./assets/icon.png" alt="ImageMagick WebGUI Icon" width="180"/> 
+
+<br/>
+
+# ImageMagick WebGUI
 
 <div align="center">
 
