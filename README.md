@@ -2,9 +2,10 @@
 
 <img src="./assets/icon.png" alt="ImageMagick WebGUI Icon" width="180"/> 
 
+# ImageMagick WebGUI
+
 <br/>
 
-# ImageMagick WebGUI
 
 <div align="center">
 
