@@ -5,7 +5,7 @@
 # ImageMagick WebGUI
 
 <br/>
-
+</div>
 
 <div align="center">
 
