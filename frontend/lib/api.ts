@@ -1,32 +1,29 @@
 import axios from 'axios';
 
-// Detect API URL - use NEXT_PUBLIC_API_URL or default to current host with port 8000
-const getApiUrl = () => {
+// Dynamic API URL - automatically uses the same host as the browser
+const getApiUrl = (): string => {
+  // In browser - use same hostname, port 8000 (or from env)
   if (typeof window !== 'undefined') {
-    // In browser - check env var first, then fall back to same host on port 8000
-    const envUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (envUrl) return envUrl;
-    
-    // Use same hostname but port 8000
-    const { protocol, hostname } = window.location;
-    return `${protocol}//${hostname}:8000`;
+    const apiPort = process.env.NEXT_PUBLIC_API_PORT || '8000';
+    return `${window.location.protocol}//${window.location.hostname}:${apiPort}`;
   }
-  // Server-side - use localhost
+  // Server-side rendering - use env or localhost
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 };
 
-const API_URL = getApiUrl();
-
+// Create axios instance without baseURL (will be set dynamically)
 export const api = axios.create({
-  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 second default timeout
 });
 
-// Add auth token to requests
+// Set baseURL dynamically before each request
 api.interceptors.request.use((config) => {
+  // Set dynamic baseURL
+  config.baseURL = getApiUrl();
+  
+  // Add auth token
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('token');
     if (token) {
@@ -35,17 +32,6 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
-
-// Add response error interceptor for better debugging
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.code === 'ERR_NETWORK') {
-      console.error('Network error - backend may be unreachable at:', API_URL);
-    }
-    return Promise.reject(error);
-  }
-);
 
 // Auth API
 export const authApi = {
@@ -68,54 +54,30 @@ export const authApi = {
     localStorage.removeItem('token');
   },
   
-  registrationStatus: async () => {
-    const { data } = await api.get('/api/auth/registration-status');
-    return data;
-  },
-  
-  changePassword: async (currentPassword: string, newPassword: string) => {
-    const { data } = await api.post('/api/auth/change-password', {
-      current_password: currentPassword,
-      new_password: newPassword,
-    });
-    return data;
-  },
-  
-  createUser: async (email: string, password: string, isAdmin: boolean = false) => {
-    const { data } = await api.post('/api/auth/create-user', {
-      email,
-      password,
-      is_admin: isAdmin,
-    });
-    return data;
-  },
-  
-  // Google OAuth
   googleStatus: async () => {
-    // Add timestamp to prevent caching
-    const { data } = await api.get(`/api/auth/google/status?_t=${Date.now()}`);
+    const { data } = await api.get('/api/auth/google/status');
     return data;
   },
   
   googleAuthUrl: async () => {
-    const { data } = await api.get('/api/auth/google');
+    const { data } = await api.get('/api/auth/google/auth-url');
     return data;
   },
   
   googleCallback: async (code: string, redirectUri: string) => {
-    const { data } = await api.post('/api/auth/google/callback', {
-      code,
-      redirect_uri: redirectUri,
-    });
+    const { data } = await api.post('/api/auth/google/callback', { code, redirect_uri: redirectUri });
     return data;
   },
 };
 
 // Images API
 export const imagesApi = {
-  upload: async (files: File[], onProgress?: (progress: number) => void) => {
+  upload: async (files: File[], projectId?: number, onProgress?: (progress: number) => void) => {
     const formData = new FormData();
     files.forEach((file) => formData.append('files', file));
+    if (projectId) {
+      formData.append('project_id', projectId.toString());
+    }
     
     const { data } = await api.post('/api/images/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -128,17 +90,40 @@ export const imagesApi = {
     return data;
   },
   
-  list: async (skip = 0, limit = 50) => {
-    const { data } = await api.get(`/api/images?skip=${skip}&limit=${limit}`);
+  list: async (skip = 0, limit = 50, projectId?: number | null) => {
+    let url = `/api/images/?skip=${skip}&limit=${limit}`;
+    if (projectId) {
+      url += `&project_id=${projectId}`;
+    }
+    const { data } = await api.get(url);
     return data;
   },
   
-  get: (imageId: number) => `${API_URL}/api/images/${imageId}`,
+  // Dynamic URL for image src
+  get: (imageId: number) => {
+    if (typeof window !== 'undefined') {
+      const apiPort = process.env.NEXT_PUBLIC_API_PORT || '8000';
+      return `${window.location.protocol}//${window.location.hostname}:${apiPort}/api/images/${imageId}`;
+    }
+    return `http://localhost:8000/api/images/${imageId}`;
+  },
   
-  getThumbnail: (imageId: number) => `${API_URL}/api/images/${imageId}/thumbnail`,
+  // Dynamic URL for thumbnail src
+  getThumbnail: (imageId: number) => {
+    if (typeof window !== 'undefined') {
+      const apiPort = process.env.NEXT_PUBLIC_API_PORT || '8000';
+      return `${window.location.protocol}//${window.location.hostname}:${apiPort}/api/images/${imageId}/thumbnail`;
+    }
+    return `http://localhost:8000/api/images/${imageId}/thumbnail`;
+  },
   
   getInfo: async (imageId: number) => {
     const { data } = await api.get(`/api/images/${imageId}/info`);
+    return data;
+  },
+  
+  getDetails: async (imageId: number) => {
+    const { data } = await api.get(`/api/images/${imageId}`);
     return data;
   },
   
@@ -146,9 +131,21 @@ export const imagesApi = {
     await api.delete(`/api/images/${imageId}`);
   },
   
+  bulkDelete: async (imageIds: number[]) => {
+    await api.post('/api/images/bulk-delete', { image_ids: imageIds });
+  },
+  
   downloadZip: async (imageIds: number[]) => {
-    const { data } = await api.post('/api/images/download-zip', imageIds, {
+    const { data } = await api.post('/api/images/download-zip', { image_ids: imageIds }, {
       responseType: 'blob',
+    });
+    return data;
+  },
+  
+  moveToProject: async (imageIds: number[], projectId: number | null) => {
+    const { data } = await api.post('/api/images/move-to-project', {
+      image_ids: imageIds,
+      project_id: projectId
     });
     return data;
   },
@@ -166,12 +163,12 @@ export const operationsApi = {
     return data;
   },
   
-  // Synchronous processing for single image - instant results
-  processSync: async (imageId: number, operations: any[], outputFormat = 'webp') => {
+  processSync: async (imageId: number, operations: any[], outputFormat = 'webp', quality = 85) => {
     const { data } = await api.post('/api/operations/process-sync', {
       image_id: imageId,
       operations,
       output_format: outputFormat,
+      quality,
     });
     return data;
   },
@@ -199,28 +196,23 @@ export const operationsApi = {
     return data;
   },
   
-  // AI: Upscale image (longer timeout - can take time)
-  upscale: async (imageId: number, scale: number = 2, method: string = 'lanczos') => {
-    const { data } = await api.post('/api/operations/upscale', {
+  preview: async (imageId: number, operations: any[]) => {
+    const { data } = await api.post('/api/operations/preview', {
       image_id: imageId,
-      scale,
-      method,
-    }, { timeout: 120000 }); // 2 minute timeout
+      operations,
+    });
     return data;
   },
   
-  // AI: Remove background (longer timeout - can take 60+ seconds)
-  removeBackground: async (imageId: number, alphaMatting: boolean = true) => {
-    const { data } = await api.post('/api/operations/remove-background-sync', {
+  removeBackground: async (imageId: number) => {
+    const { data } = await api.post('/api/operations/remove-background', {
       image_id: imageId,
-      alpha_matting: alphaMatting,
-    }, { timeout: 180000 }); // 3 minute timeout
+    });
     return data;
   },
   
-  // Get AI capabilities
-  getAiCapabilities: async () => {
-    const { data } = await api.get('/api/operations/ai-capabilities');
+  aiStatus: async () => {
+    const { data } = await api.get('/api/operations/ai-status');
     return data;
   },
 };
@@ -256,22 +248,6 @@ export const queueApi = {
     return data;
   },
   
-  // Alias for downloadResults
-  downloadJob: async (jobId: string) => {
-    const { data } = await api.get(`/api/queue/jobs/${jobId}/download`, {
-      responseType: 'blob',
-    });
-    return data;
-  },
-  
-  // Download single file from job
-  downloadJobFile: async (jobId: string, fileIndex: number) => {
-    const { data } = await api.get(`/api/queue/jobs/${jobId}/files/${fileIndex}`, {
-      responseType: 'blob',
-    });
-    return data;
-  },
-  
   deleteJob: async (jobId: string) => {
     await api.delete(`/api/queue/jobs/${jobId}`);
   },
@@ -297,12 +273,12 @@ export const settingsApi = {
 // Projects API
 export const projectsApi = {
   list: async () => {
-    const { data } = await api.get('/api/projects');
+    const { data } = await api.get('/api/projects/');
     return data;
   },
   
-  create: async (name: string, description?: string, color?: string, icon?: string) => {
-    const { data } = await api.post('/api/projects', { name, description, color, icon });
+  create: async (name: string, description?: string, color?: string) => {
+    const { data } = await api.post('/api/projects/', { name, description, color });
     return data;
   },
   
@@ -311,28 +287,37 @@ export const projectsApi = {
     return data;
   },
   
-  update: async (projectId: number, updates: { name?: string; description?: string; color?: string; icon?: string }) => {
+  update: async (projectId: number, updates: { name?: string; description?: string; color?: string }) => {
     const { data } = await api.put(`/api/projects/${projectId}`, updates);
     return data;
   },
   
   delete: async (projectId: number) => {
-    const { data } = await api.delete(`/api/projects/${projectId}`);
+    await api.delete(`/api/projects/${projectId}`);
+  },
+};
+
+// History API
+export const historyApi = {
+  list: async (skip = 0, limit = 50) => {
+    const { data } = await api.get(`/api/history/?skip=${skip}&limit=${limit}`);
     return data;
   },
   
-  addImages: async (projectId: number, imageIds: number[]) => {
-    const { data } = await api.post(`/api/projects/${projectId}/images`, { image_ids: imageIds });
+  get: async (historyId: number) => {
+    const { data } = await api.get(`/api/history/${historyId}`);
     return data;
   },
   
-  removeImages: async (imageIds: number[]) => {
-    const { data } = await api.post('/api/projects/images/remove', { image_ids: imageIds });
-    return data;
+  delete: async (historyId: number) => {
+    await api.delete(`/api/history/${historyId}`);
   },
   
-  getImages: async (projectId: number) => {
-    const { data } = await api.get(`/api/projects/${projectId}/images`);
+  getStats: async () => {
+    const { data } = await api.get('/api/history/stats');
     return data;
   },
 };
+
+// Export getApiUrl for use elsewhere if needed
+export { getApiUrl };
