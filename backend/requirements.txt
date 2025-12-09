@@ -30,7 +30,7 @@ Wand>=0.6.13,<1.0.0
 aiofiles>=23.2.0,<24.0.0
 python-magic>=0.4.27,<1.0.0
 # IMPORTANT: Pillow 12 requires Python 3.14, pin to 11.x for Python 3.12
-Pillow>=10.2.0,<12.0.0
+Pillow>=10.2.0,<13.0.0
 
 # AI Background Removal
 # IMPORTANT: rembg 2.0.62+ requires Python 3.10-3.13, onnxruntime needs Python <=3.12
