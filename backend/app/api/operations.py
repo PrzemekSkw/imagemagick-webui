@@ -920,6 +920,7 @@ async def process_sync(
     )
     
     logger.info(f"PROCESS-SYNC: input={validated_input_path}, output={output_path}")
+    logger.info(f"PROCESS-SYNC: operations={operations}")
     
     # Build and execute command
     command = await imagemagick_service.build_command(
@@ -928,7 +929,7 @@ async def process_sync(
         operations
     )
     
-    logger.debug(f"PROCESS-SYNC: command={command}")
+    logger.info(f"PROCESS-SYNC: command={command}")
     
     success, stdout, stderr = await imagemagick_service.execute(command)
     
@@ -1019,12 +1020,7 @@ async def download_direct(
     operations = [op.model_dump() for op in request.operations]
     
     # For PDF input, force image output since ImageMagick rasterizes PDFs
-    allowed_formats = {"webp", "png", "jpg", "jpeg", "gif"}
-    # Validate and sanitize output_format
-    requested_format = request.output_format.lower().strip()
-    if requested_format not in allowed_formats:
-        raise HTTPException(status_code=400, detail="Invalid output format")
-    actual_output_format = requested_format
+    actual_output_format = request.output_format
     is_pdf_input = validated_input_path.lower().endswith('.pdf') or (image.mime_type and 'pdf' in image.mime_type.lower())
     if is_pdf_input:
         actual_output_format = 'png'  # PDF is rasterized, output as PNG
@@ -1035,26 +1031,17 @@ async def download_direct(
     
     # Use temp directory for output (already in allowed dirs)
     output_path = os.path.join(tempfile.gettempdir(), f"download_{uuid.uuid4().hex}.{actual_output_format}")
-    # Security: Ensure normalized output_path stays within tempdir
-    normalized_output_path = os.path.normpath(output_path)
-    tempdir = os.path.normpath(tempfile.gettempdir())
-    if not normalized_output_path.startswith(tempdir):
-        raise HTTPException(
-            status_code=400, 
-            detail="Invalid output path generated"
-        )
     
-    # Now use normalized_output_path below
     # Build and execute command
     command = await imagemagick_service.build_command(
         validated_input_path,
-        normalized_output_path,
+        output_path,
         operations
     )
     
     success, stdout, stderr = await imagemagick_service.execute(command)
     
-    if not success or not Path(normalized_output_path).exists():
+    if not success or not Path(output_path).exists():
         raise HTTPException(status_code=500, detail=f"Processing failed: {stderr}")
     
     # Get MIME type
@@ -1069,7 +1056,7 @@ async def download_direct(
     
     # Return file for download
     return FileResponse(
-        path=normalized_output_path,
+        path=output_path,
         filename=output_filename,
         media_type=media_type,
         headers={

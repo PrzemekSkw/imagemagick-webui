@@ -236,10 +236,14 @@ class ImageMagickService:
                 # CSS blur is visually stronger, so we need higher sigma in IM
                 # After testing: CSS 10px ≈ ImageMagick sigma 8-10
                 css_blur = float(params.get("sigma", params.get("radius", 0)))
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"BLUR: css_blur={css_blur}, params={params}")
                 if css_blur > 0:
                     # Use gaussian-blur for better quality and closer match to CSS
                     sigma = css_blur * 0.8  # 80% of CSS value
                     cmd_parts.append(f"-gaussian-blur 0x{sigma:.1f}")
+                    logger.info(f"BLUR: Added -gaussian-blur 0x{sigma:.1f}")
             
             elif op_name == "sharpen":
                 radius = float(params.get("radius", 0))
@@ -548,9 +552,14 @@ class ImageMagickService:
                 logger.info(f"pdftoppm returncode: {process.returncode}, checking for: {temp_file}")
                 
                 if process.returncode == 0 and Path(temp_file).exists():
-                    # Now resize to thumbnail size
-                    resize_cmd = f'magick "{temp_file}" -thumbnail "{size}x{size}>" -quality 85 "{output_path}"'
-                    success, _, resize_err = await self.execute(resize_cmd)
+                    # Now resize to thumbnail size - try both commands
+                    for resize_cmd_name in ["magick", "convert"]:
+                        resize_cmd = f'{resize_cmd_name} "{temp_file}" -thumbnail "{size}x{size}>" -quality 85 "{output_path}"'
+                        success, _, resize_err = await self.execute(resize_cmd)
+                        if success:
+                            break
+                        if "not found" not in resize_err.lower():
+                            break
                     
                     # Clean up temp file
                     try:
@@ -602,9 +611,12 @@ class ImageMagickService:
                 await asyncio.wait_for(process.communicate(), timeout=30)
                 
                 if Path(gs_output).exists():
-                    # Resize
-                    resize_cmd = f'magick "{gs_output}" -thumbnail "{size}x{size}>" -quality 85 "{output_path}"'
-                    success, _, _ = await self.execute(resize_cmd)
+                    # Resize - try both commands
+                    for resize_cmd_name in ["magick", "convert"]:
+                        resize_cmd = f'{resize_cmd_name} "{gs_output}" -thumbnail "{size}x{size}>" -quality 85 "{output_path}"'
+                        success, _, _ = await self.execute(resize_cmd)
+                        if success:
+                            break
                     try:
                         Path(gs_output).unlink()
                     except:
