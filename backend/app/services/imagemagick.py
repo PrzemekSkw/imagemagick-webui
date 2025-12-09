@@ -241,7 +241,7 @@ class ImageMagickService:
                 logger.info(f"BLUR: css_blur={css_blur}, params={params}")
                 if css_blur > 0:
                     # Use gaussian-blur for better quality and closer match to CSS
-                    sigma = css_blur * 0.8  # 80% of CSS value
+                    sigma = css_blur * 3.0  # 80% of CSS value
                     cmd_parts.append(f"-gaussian-blur 0x{sigma:.1f}")
                     logger.info(f"BLUR: Added -gaussian-blur 0x{sigma:.1f}")
             
