@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Eye, EyeOff, Loader2, Sparkles, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -126,8 +127,15 @@ export default function LoginPage() {
         <div className="bg-card rounded-2xl border border-border p-8">
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-              <Sparkles className="h-5 w-5 text-primary-foreground" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden">
+              <Image
+                src="/logo.png"
+                alt="ImageMagick WebGUI"
+                width={40}
+                height={40}
+                className="object-contain"
+                priority
+              />
             </div>
             <div>
               <h1 className="font-semibold">ImageMagick WebGUI</h1>

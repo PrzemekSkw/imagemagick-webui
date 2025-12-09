@@ -1,13 +1,47 @@
-# Force LF line endings for shell scripts (fixes Windows/Docker issue)
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Force LF line endings for shell scripts (critical for Docker)
 *.sh text eol=lf
 scripts/* text eol=lf
+start.sh text eol=lf
 
 # Force LF for Docker files
 Dockerfile text eol=lf
 docker-compose.yml text eol=lf
-.env* text eol=lf
+docker-compose.yaml text eol=lf
+.dockerignore text eol=lf
+
+# Force LF for environment files
+.env text eol=lf
+.env.* text eol=lf
 
 # Force LF for config files
 *.json text eol=lf
 *.yaml text eol=lf
 *.yml text eol=lf
+*.toml text eol=lf
+
+# Force LF for source code
+*.py text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+
+# Binary files - do not modify
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary

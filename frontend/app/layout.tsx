@@ -17,9 +17,9 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   icons: {
     icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: '48x48' },
     ],
-    apple: '/icon-192.png',
+    apple: '/apple-touch-icon.png',
   },
 };
 
@@ -50,8 +50,8 @@ export default function RootLayout({
           <QueryProvider>
             <SettingsProvider>
               {children}
+              <Toaster richColors position="top-right" />
             </SettingsProvider>
-            <Toaster />
           </QueryProvider>
         </ThemeProvider>
       </body>
