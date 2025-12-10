@@ -77,7 +77,7 @@ function ImageCard({ image, selected, onToggle, onDelete, onPreview, onEdit }: I
         <img
           src={currentUrl}
           alt={image.originalFilename}
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover" style={{ backgroundImage: "linear-gradient(45deg, #e0e0e0 25%, transparent 25%), linear-gradient(-45deg, #e0e0e0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e0e0e0 75%), linear-gradient(-45deg, transparent 75%, #e0e0e0 75%)", backgroundSize: "16px 16px", backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0px" }}
           loading="lazy"
           onError={() => {
             if (!useFallback) {

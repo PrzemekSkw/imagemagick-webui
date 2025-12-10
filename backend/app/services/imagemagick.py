@@ -172,6 +172,15 @@ class ImageMagickService:
         cmd_parts.append("-auto-orient")
         
         # Process operations
+        # Get image dimensions for scaling
+        img_width = None
+        try:
+            from PIL import Image as PILImage
+            with PILImage.open(input_path) as pil_img:
+                img_width = pil_img.width
+        except:
+            pass
+
         for op in operations:
             op_name = op.get("operation", "").lower().replace("_", "-")
             params = op.get("params", {})
@@ -241,7 +250,7 @@ class ImageMagickService:
                 logger.info(f"BLUR: css_blur={css_blur}, params={params}")
                 if css_blur > 0:
                     # Use gaussian-blur for better quality and closer match to CSS
-                    sigma = css_blur * 3.0  # 80% of CSS value
+                    sigma = css_blur * 1.0  # 80% of CSS value
                     cmd_parts.append(f"-blur 0x{sigma:.1f}")
                     logger.info(f"BLUR: Added -blur 0x{sigma:.1f}")
             
@@ -299,7 +308,10 @@ class ImageMagickService:
                     # Sanitize text - remove dangerous characters
                     text = re.sub(r'[`$\\]', '', text)
                     position = params.get("position", "southeast").lower()
-                    font_size = int(params.get("font_size", 24))
+                    font_size_base = int(params.get("font_size", 24))
+                    # Scale font size based on image dimensions (24pt looks good on ~800px image)
+                    # For larger images, scale up proportionally
+                    font_size = max(font_size_base, int(font_size_base * (img_width / 800))) if img_width else font_size_base
                     color = params.get("color", "white")
                     opacity = float(params.get("opacity", 0.5))
                     
