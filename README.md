@@ -328,7 +328,9 @@ Your support helps maintain and improve this project. Thank you! ❤️
 
 If you find this project useful, please consider giving it a star on GitHub!
 
-[![Star History Chart](https://api.star-history.com/svg?repos=PrzemekSkw/imagemagick-webui&type=Date)](https://star-history.com/#PrzemekSkw/imagemagick-webui&Date)
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=PrzemekSkw/imagemagick-webui&type=date&legend=top-left)](https://www.star-history.com/#PrzemekSkw/imagemagick-webui&type=date&legend=top-left)
 
 ---
 
