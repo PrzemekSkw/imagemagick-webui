@@ -65,53 +65,33 @@ https://github.com/user-attachments/assets/53538ac9-8642-4c9b-972f-772c17efa9fa
 ### Prerequisites
 - [Docker](https://docs.docker.com/get-docker/) 20.10+ and [Docker Compose](https://docs.docker.com/compose/install/) 2.0+
 
-### Recommended: Use Pre-built Image
+### Option 1: Using Docker Image (Recommended)
 ```bash
-# 1. Create project directory
+# Create project directory
 mkdir imagemagick-webgui && cd imagemagick-webgui
 
-# 2. Download docker-compose.yml
-curl -O https://raw.githubusercontent.com/przemekskw/imagemagick-webui/main/docker-compose.yml
+# Download docker-compose file
+curl -O https://raw.githubusercontent.com/PrzemekSkw/imagemagick-webui/main/docker-compose.example.yml
+mv docker-compose.example.yml docker-compose.yml
 
-# 3. Start the application
+# Start the application
 docker compose up -d
 ```
 
 **That's it!** Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Option 2: Build from Source
+```bash
+git clone https://github.com/PrzemekSkw/imagemagick-webui.git
+cd imagemagick-webgui
+cp .env.example .env
+docker compose up --build -d
+```
 
 > ⚠️ **Important**: Change `SECRET_KEY` in docker-compose.yml before deploying to production!
 
 
-### Alternative: Build from Source
-
-```bash
-git clone https://github.com/przemekskw/imagemagick-webui.git
-cd imagemagick-webui\
-cp .env.example .env
-docker compose up --build
-```
-
-**That's it!** Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Using Docker Image
-```bash
-```bash
-mkdir imagemagick-webgui
-cd imagemagick-webgui
-
-# Download docker-compose.yml
-curl -O https://raw.githubusercontent.com/PrzemekSkw/imagemagick-webui/main/docker-compose.example.yml
-mv docker-compose.example.yml docker-compose.yml
-
-# Pull image (optional - compose does this automatically)
-docker pull ghcr.io/przemekskw/imagemagick-webui:latest
-
-# Start
-docker compose up -d
-```
-
 Open http://localhost:3000
-
 
 
 ### Default Ports

@@ -6,49 +6,115 @@ Before installing ImageMagick WebGUI, ensure you have:
 
 - **Docker** 20.10+ ([Install Docker](https://docs.docker.com/get-docker/))
 - **Docker Compose** 2.0+ ([Install Compose](https://docs.docker.com/compose/install/))
-- **Git** (optional, for cloning)
 
 ### System Requirements
 
 | Component | Minimum | Recommended |
 |-----------|---------|-------------|
-| RAM | 2 GB | 4 GB |
+| RAM | 2 GB | 4 GB (8 GB for AI features) |
 | CPU | 2 cores | 4 cores |
 | Disk | 5 GB | 10 GB |
-| OS | Linux, macOS, Windows 10+ | Linux |
+| Architecture | x86_64 (AMD/Intel) | x86_64 |
+
+> ⚠️ ARM architecture (Raspberry Pi, Apple Silicon) is not fully supported due to onnxruntime limitations.
 
 ---
 
-## Installation Methods
+## Quick Install (Recommended)
 
-### Method 1: Docker (Recommended)
-
+The easiest way to run ImageMagick WebGUI using the pre-built Docker image:
 ```bash
-# Clone the repository
-git clone https://github.com/przemekskw/imagemagick-webui.git
-cd imagemagick-webui
+# Create directory
+mkdir imagemagick-webgui && cd imagemagick-webgui
 
-# Start all services
-docker compose up --build
+# Download docker-compose file
+curl -O https://raw.githubusercontent.com/PrzemekSkw/imagemagick-webui/main/docker-compose.example.yml
+mv docker-compose.example.yml docker-compose.yml
+
+# Start the application
+docker compose up -d
 ```
 
-The first build takes 5-10 minutes. Subsequent starts are instant.
+**That's it!** Open http://localhost:3000
 
-### Method 2: Download Release
+---
 
-1. Go to [Releases](https://github.com/przemekskw/imagemagick-webui/releases)
-2. Download the latest `imagemagick-webgui.zip`
-3. Extract and run:
+## Build from Source
 
+If you want to modify the code or build locally:
 ```bash
-unzip imagemagick-webgui.zip
+# Clone repository
+git clone https://github.com/PrzemekSkw/imagemagick-webui.git
 cd imagemagick-webgui
-docker compose up --build
+
+# Copy environment file
+cp .env.example .env
+
+# Build and start (takes 5-10 minutes first time)
+docker compose up --build -d
 ```
 
-### Method 3: Local Development
+---
 
-For development without Docker:
+## Custom Ports
+
+If ports 3000 or 8000 are already in use, edit `docker-compose.yml`:
+```yaml
+services:
+  app:
+    ports:
+      - "3016:3000"   # Frontend on port 3016
+      - "8016:8000"   # Backend on port 8016
+```
+
+---
+
+## Access from Phone/Tablet
+
+The application automatically detects your IP address. To access from other devices on the same network:
+
+1. Find your computer's IP:
+```bash
+   # Linux/Mac
+   ip addr | grep "inet 192"
+   
+   # Windows
+   ipconfig
+```
+
+2. Open on phone: `http://192.168.x.x:3000`
+
+---
+
+## Updating
+
+To update to the latest version:
+```bash
+docker compose pull
+docker compose up -d
+```
+
+---
+
+## Uninstalling
+
+To completely remove the application:
+```bash
+# Stop and remove containers
+docker compose down
+
+# Remove volumes (deletes all data!)
+docker compose down -v
+
+# Remove images
+docker rmi ghcr.io/przemekskw/imagemagick-webui:latest
+```
+
+---
+
+## Local Development (without Docker)
+
+For development:
 
 **Backend:**
 ```bash
@@ -57,7 +123,7 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Start PostgreSQL and Redis locally or via Docker:
+# Start PostgreSQL and Redis via Docker:
 docker run -d --name postgres -e POSTGRES_PASSWORD=imagemagick -p 5432:5432 postgres:16-alpine
 docker run -d --name redis -p 6379:6379 redis:7-alpine
 
@@ -74,75 +140,28 @@ npm run dev
 
 ---
 
-## Verify Installation
+## Troubleshooting
 
-After starting, verify all services are running:
-
+### Container won't start
+Check logs:
 ```bash
-docker compose ps
+docker compose logs app
 ```
 
-Expected output:
-```
-NAME                    STATUS
-imagemagick-webgui-app  running (healthy)
-imagemagick-webgui-db   running
-imagemagick-webgui-redis running
-imagemagick-webgui-worker running
-```
+### Database connection error
+Wait 30 seconds and try again - PostgreSQL needs time to initialize on first run.
 
-### Access Points
-
-| Service | URL |
-|---------|-----|
-| Web Interface | http://localhost:3000 |
-| API Docs | http://localhost:8000/docs |
-| Health Check | http://localhost:8000/health |
-
----
-
-## Troubleshooting Installation
-
-### Port Already in Use
-
+### Permission denied errors
+On Linux, you may need:
 ```bash
-# Check what's using port 3000
-lsof -i :3000  # Linux/macOS
-netstat -ano | findstr :3000  # Windows
-
-# Change ports in docker-compose.yml
-ports:
-  - "3001:3000"  # Use 3001 instead
+sudo docker compose up -d
 ```
 
-### Docker Build Fails
-
-```bash
-# Clean Docker cache
-docker compose down -v
-docker system prune -af
-docker compose build --no-cache
+### Out of memory
+Reduce ImageMagick memory limit in docker-compose.yml:
+```yaml
+environment:
+  - IMAGEMAGICK_MEMORY_LIMIT=1GiB
 ```
 
-### Permission Denied
-
-```bash
-# Linux: Add user to docker group
-sudo usermod -aG docker $USER
-# Log out and back in
-```
-
-### Out of Memory
-
-```bash
-# Increase Docker memory limit
-# Docker Desktop: Settings → Resources → Memory → 4GB+
-```
-
----
-
-## Next Steps
-
-- [[Configuration]] - Customize your installation
-- [[Quick Start Guide]] - Process your first image
-- [[Dashboard Overview]] - Learn the interface
+See [Troubleshooting](Troubleshooting) for more solutions.

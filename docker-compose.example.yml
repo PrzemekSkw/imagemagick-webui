@@ -1,0 +1,50 @@
+services:
+  app:
+    image: ghcr.io/przemekskw/imagemagick-webui:latest
+    ports:
+      - "3000:3000"
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://imagemagick:imagemagick@postgres:5432/imagemagick
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=change-this-to-random-32-character-string
+      - IMAGEMAGICK_TIMEOUT=120
+      - IMAGEMAGICK_MEMORY_LIMIT=4GiB
+      - MAX_UPLOAD_SIZE=104857600
+      - ALLOWED_ORIGINS=*
+    volumes:
+      - uploads:/app/uploads
+      - processed:/app/processed
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=imagemagick
+      - POSTGRES_PASSWORD=imagemagick
+      - POSTGRES_DB=imagemagick
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U imagemagick"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  uploads:
+  processed:
+  postgres_data:
+  redis_data:
