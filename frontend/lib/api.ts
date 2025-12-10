@@ -295,6 +295,24 @@ export const projectsApi = {
   delete: async (projectId: number) => {
     await api.delete(`/api/projects/${projectId}`);
   },
+  
+  // Add images to project
+  addImages: async (projectId: number, imageIds: number[]) => {
+    const { data } = await api.post('/api/images/move-to-project', {
+      image_ids: imageIds,
+      project_id: projectId
+    });
+    return data;
+  },
+  
+  // Remove images from project (set project_id to null)
+  removeImages: async (imageIds: number[]) => {
+    const { data } = await api.post('/api/images/move-to-project', {
+      image_ids: imageIds,
+      project_id: null
+    });
+    return data;
+  },
 };
 
 // History API

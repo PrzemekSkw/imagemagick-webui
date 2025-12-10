@@ -242,8 +242,8 @@ class ImageMagickService:
                 if css_blur > 0:
                     # Use gaussian-blur for better quality and closer match to CSS
                     sigma = css_blur * 3.0  # 80% of CSS value
-                    cmd_parts.append(f"-gaussian-blur 0x{sigma:.1f}")
-                    logger.info(f"BLUR: Added -gaussian-blur 0x{sigma:.1f}")
+                    cmd_parts.append(f"-blur 0x{sigma:.1f}")
+                    logger.info(f"BLUR: Added -blur 0x{sigma:.1f}")
             
             elif op_name == "sharpen":
                 radius = float(params.get("radius", 0))
@@ -547,7 +547,7 @@ class ImageMagickService:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=120)
                 
                 logger.info(f"pdftoppm returncode: {process.returncode}, checking for: {temp_file}")
                 
@@ -608,7 +608,7 @@ class ImageMagickService:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                await asyncio.wait_for(process.communicate(), timeout=30)
+                await asyncio.wait_for(process.communicate(), timeout=120)
                 
                 if Path(gs_output).exists():
                     # Resize - try both commands

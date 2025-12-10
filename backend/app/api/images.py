@@ -547,3 +547,40 @@ async def download_images_as_zip(
         media_type="application/zip",
         headers={"Content-Disposition": "attachment; filename=images.zip"}
     )
+
+
+class MoveToProjectRequest(BaseModel):
+    image_ids: List[int]
+    project_id: Optional[int] = None
+
+
+@router.post("/move-to-project")
+async def move_images_to_project(
+    request: MoveToProjectRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Move images to a project (or remove from project if project_id is None)"""
+    if not request.image_ids:
+        raise HTTPException(status_code=400, detail="No images specified")
+    
+    # Build query
+    query = select(Image).where(Image.id.in_(request.image_ids))
+    
+    # If logged in, only allow moving own images
+    if current_user:
+        query = query.where(Image.user_id == current_user.id)
+    
+    result = await db.execute(query)
+    images = result.scalars().all()
+    
+    if not images:
+        raise HTTPException(status_code=404, detail="No images found")
+    
+    # Update project_id for all images
+    for image in images:
+        image.project_id = request.project_id
+    
+    await db.commit()
+    
+    return {"message": f"Moved {len(images)} images", "count": len(images)}
