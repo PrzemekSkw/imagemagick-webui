@@ -93,7 +93,7 @@ docker compose up --build
 
 **That's it!** Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Using Docker Image (Recommended)
+### Using Docker Image
 ```bash
 ```bash
 mkdir imagemagick-webgui
