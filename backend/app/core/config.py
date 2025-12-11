@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     temp_dir: str = "/tmp/imagemagick"
     
     # ImageMagick
-    imagemagick_timeout: int = 120
+    imagemagick_timeout: int = 180
     imagemagick_memory_limit: str = "2GB"
     max_concurrent_jobs: int = 10
     

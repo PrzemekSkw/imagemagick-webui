@@ -241,18 +241,18 @@ class ImageMagickService:
                 cmd_parts.append(f"-quality {quality}")
             
             elif op_name == "blur":
-                # CSS blur(Xpx) vs ImageMagick -gaussian-blur
-                # CSS blur is visually stronger, so we need higher sigma in IM
-                # After testing: CSS 10px ≈ ImageMagick sigma 8-10
                 css_blur = float(params.get("sigma", params.get("radius", 0)))
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.info(f"BLUR: css_blur={css_blur}, params={params}")
                 if css_blur > 0:
-                    # Use gaussian-blur for better quality and closer match to CSS
-                    sigma = css_blur * 1.0  # 80% of CSS value
+                    # Scale blur based on image size (CSS blur calibrated for ~800px preview)
+                    if img_width and img_width > 800:
+                        scale_factor = img_width / 800
+                        sigma = css_blur * scale_factor
+                    else:
+                        sigma = css_blur * 1.0
                     cmd_parts.append(f"-blur 0x{sigma:.1f}")
-                    logger.info(f"BLUR: Added -blur 0x{sigma:.1f}")
+                    logger.info(f"BLUR: css_blur={css_blur}, img_width={img_width}, sigma={sigma:.1f}")
             
             elif op_name == "sharpen":
                 radius = float(params.get("radius", 0))

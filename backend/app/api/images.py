@@ -376,7 +376,7 @@ async def get_preview(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=180)
         
         if process.returncode == 0 and Path(validated_preview).exists():
             return FileResponse(
@@ -395,7 +395,7 @@ async def get_preview(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=30)
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=180)
         
         if process.returncode == 0 and Path(validated_preview).exists():
             return FileResponse(
