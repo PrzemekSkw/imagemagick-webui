@@ -9,11 +9,11 @@
 
 <div align="center">
 
-![ImageMagick WebGUI](https://img.shields.io/badge/ImageMagick-WebGUI-blue?style=for-the-badge)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-Python-009688?style=for-the-badge&logo=fastapi&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+[![Stars](https://img.shields.io/github/stars/PrzemekSkw/imagemagick-webui?style=for-the-badge)](https://github.com/PrzemekSkw/imagemagick-webui/stargazers)
+[![Forks](https://img.shields.io/github/forks/PrzemekSkw/imagemagick-webui?style=for-the-badge)](https://github.com/PrzemekSkw/imagemagick-webui/network/members)
+[![Issues](https://img.shields.io/github/issues/PrzemekSkw/imagemagick-webui?style=for-the-badge)](https://github.com/PrzemekSkw/imagemagick-webui/issues)
+[![License](https://img.shields.io/github/license/PrzemekSkw/imagemagick-webui?style=for-the-badge)](https://github.com/PrzemekSkw/imagemagick-webui/blob/main/LICENSE)
+[![Docker Pulls](https://img.shields.io/docker/pulls/przemekskw/imagemagick-webui?style=for-the-badge)](https://hub.docker.com/r/przemekskw/imagemagick-webui)
 
 **A modern, beautiful web interface for ImageMagick with AI-powered features**
 
@@ -206,12 +206,17 @@ magick base.jpg overlay.png -composite output.jpg
 ### Image Editor
 ![Editor](docs/screenshots/editor.png)
 
-### Batch Processing
-![Batch](docs/screenshots/batch.png)
+### Dark Mode
+![Dark Mode](docs/screenshots/darkmode.png)
 
-### Terminal Mode
-![Terminal](docs/screenshots/terminal.png)
+### Login Page
+![Login](docs/screenshots/login.png)
 
+### Register Page
+![Register](docs/screenshots/register.png)
+
+### Settings
+![Settings](docs/screenshots/settings.png)
 </details>
 
 ---

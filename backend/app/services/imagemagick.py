@@ -595,7 +595,7 @@ class ImageMagickService:
             logger.info("Trying ImageMagick fallback for PDF")
             for cmd in ["magick", "convert"]:
                 try:
-                    command = f'{cmd} -density 150 "{input_path}[0]" -thumbnail "{size}x{size}>" -quality 85 -background white -flatten "{output_path}"'
+                    command = f'{cmd} -density 150 "{input_path}[0]" -thumbnail "{size}x{size}>" -quality 85 "{output_path}"'
                     logger.info(f"PDF fallback command: {command}")
                     success, stdout, stderr = await self.execute(command)
                     
@@ -648,20 +648,34 @@ class ImageMagickService:
                     from PIL import Image as PILImage
                     
                     with PILImage.open(input_path) as img:
-                        # Calculate thumbnail size maintaining aspect ratio
-                        img.thumbnail((size, size), PILImage.Resampling.LANCZOS)
-                        
-                        # If RGBA, composite on white background for webp thumbnail
-                        if img.mode == 'RGBA':
-                            background = PILImage.new('RGB', img.size, (255, 255, 255))
-                            background.paste(img, mask=img.split()[3])  # Use alpha as mask
-                            img = background
-                        elif img.mode != 'RGB':
-                            img = img.convert('RGB')
-                        
-                        # Save thumbnail
-                        img.save(output_path, 'WEBP', quality=85)
-                        
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
+                        # Save as PNG to preserve transparency
+                        img.save(output_path, 'PNG', optimize=True)
                         if Path(output_path).exists():
                             logger.info(f"PNG thumbnail created with Pillow: {output_path}")
                             return True
@@ -671,7 +685,7 @@ class ImageMagickService:
             # Regular image - use ImageMagick
             for cmd in ["magick", "convert"]:
                 try:
-                    command = f'{cmd} "{input_path}" -thumbnail "{size}x{size}>" -quality 85 -background white -flatten "{output_path}"'
+                    command = f'{cmd} "{input_path}" -thumbnail "{size}x{size}>" -quality 85 "{output_path}"'
                     logger.info(f"Thumbnail command: {command}")
                     success, stdout, stderr = await self.execute(command)
                     

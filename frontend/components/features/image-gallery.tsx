@@ -514,7 +514,7 @@ export function ImageGallery() {
             
             {previewImage && (
               <div className="space-y-4">
-                <div className="relative aspect-video rounded-xl overflow-hidden bg-secondary">
+                <div className="relative aspect-video rounded-xl overflow-hidden" style={{ backgroundImage: "linear-gradient(45deg, #e5e5e5 25%, transparent 25%), linear-gradient(-45deg, #e5e5e5 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e5e5 75%), linear-gradient(-45deg, transparent 75%, #e5e5e5 75%)", backgroundSize: "16px 16px", backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0px", backgroundColor: "white" }}>
                   {previewImage.mimeType === 'application/pdf' ? (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <FileText className="h-24 w-24 text-red-500" />
