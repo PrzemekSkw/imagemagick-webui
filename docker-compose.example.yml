@@ -1,29 +1,87 @@
+# ============================================
+# ImageMagick WebGUI - Production Ready
+# ============================================
+# 
+# QUICK START:
+# 1. Save this file as: docker-compose.yml
+# 2. Run: docker compose up -d
+# 3. Open: http://localhost:3000
+#
+# CHANGE PORTS:
+# Edit lines 28, 29, 31 (marked with ← CHANGE HERE)
+# Then run: docker compose down && docker compose build --no-cache && docker compose up -d
+#
+# ============================================
+
 services:
   app:
-    image: ghcr.io/przemekskw/imagemagick-webui:latest
+    image: przemekskw/imagemagick-webui:latest
+    # OR build from source:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    #   args:
+    #     NEXT_PUBLIC_API_PORT: "8000"  # ← CHANGE HERE if using custom port
     ports:
-      - "3000:3000"
-      - "8000:8000"
+      - "3000:3000"  # ← CHANGE HERE: "HOST_PORT:3000" (e.g., "3012:3000")
+      - "8000:8000"  # ← CHANGE HERE: "HOST_PORT:8000" (e.g., "8012:8000")
     environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_PORT=8000  # ← CHANGE HERE to match backend HOST_PORT above
+      - ALLOWED_ORIGINS=*
+      
+      # Database (internal - don't change)
       - DATABASE_URL=postgresql+asyncpg://imagemagick:imagemagick@postgres:5432/imagemagick
       - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=change-this-to-random-32-character-string
-      - IMAGEMAGICK_TIMEOUT=120
-      - IMAGEMAGICK_MEMORY_LIMIT=4GiB
-      - MAX_UPLOAD_SIZE=104857600
-      - ALLOWED_ORIGINS=*
+      
+      # Security (CHANGE IN PRODUCTION!)
+      - SECRET_KEY=CHANGE_THIS_supersecretkey_production_abc123
+      - JWT_SECRET=CHANGE_THIS_jwt_secret_production_xyz789
+      
+      # Authentication
+      - REQUIRE_LOGIN=false  # Set to true to require login
+      - ALLOW_REGISTRATION=true  # Set to false to disable new signups
+      
+      # Image Processing
+      - DEFAULT_OUTPUT_FORMAT=webp
+      - DEFAULT_QUALITY=85
+      - MAX_UPLOAD_SIZE_MB=100
+      - IMAGEMAGICK_TIMEOUT=300
+      - IMAGEMAGICK_MEMORY_LIMIT=2GB
+      
+      # History
+      - HISTORY_RETENTION_HOURS=24
+      
+      # Timezone
+      - TZ=UTC
+      
+      # Google OAuth (optional)
+      - GOOGLE_CLIENT_ID=
+      - GOOGLE_CLIENT_SECRET=
+      
     volumes:
       - uploads:/app/uploads
       - processed:/app/processed
+      - temp:/tmp/imagemagick
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2'
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     environment:
       - POSTGRES_USER=imagemagick
       - POSTGRES_PASSWORD=imagemagick
@@ -39,12 +97,23 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
 volumes:
-  uploads:
-  processed:
   postgres_data:
   redis_data:
+  uploads:
+  processed:
+  temp:
+
+networks:
+  default:
+    driver: bridge

@@ -1,21 +1,34 @@
 import axios from 'axios';
 
-// Dynamic API URL - automatically uses the same host as the browser
+// Dynamic API URL - automatically detects if behind reverse proxy
 const getApiUrl = (): string => {
-  // In browser - use same hostname, port 8000 (or from env)
+  // In browser
   if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    const port = window.location.port;
+    
+    // If using standard ports (80/443) or reverse proxy → no port needed
+    // API will be at same host as frontend (reverse proxy handles routing)
+    if (!port || port === '80' || port === '443') {
+      return `${protocol}//${hostname}`;
+    }
+    
+    // If custom port (like localhost:3012) → use API port
     const apiPort = process.env.NEXT_PUBLIC_API_PORT || '8000';
-    return `${window.location.protocol}//${window.location.hostname}:${apiPort}`;
+    return `${protocol}//${hostname}:${apiPort}`;
   }
+  
   // Server-side rendering - use env or localhost
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 };
 
-// Create axios instance without baseURL (will be set dynamically)
+// Create axios instance
 export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 300000, // 5 minutes
 });
 
 // Set baseURL dynamically before each request
@@ -102,8 +115,18 @@ export const imagesApi = {
   // Dynamic URL for image src
   get: (imageId: number) => {
     if (typeof window !== 'undefined') {
+      const protocol = window.location.protocol;
+      const hostname = window.location.hostname;
+      const port = window.location.port;
+      
+      // If standard ports or reverse proxy → no port
+      if (!port || port === '80' || port === '443') {
+        return `${protocol}//${hostname}/api/images/${imageId}`;
+      }
+      
+      // If custom port → use API port
       const apiPort = process.env.NEXT_PUBLIC_API_PORT || '8000';
-      return `${window.location.protocol}//${window.location.hostname}:${apiPort}/api/images/${imageId}`;
+      return `${protocol}//${hostname}:${apiPort}/api/images/${imageId}`;
     }
     return `http://localhost:8000/api/images/${imageId}`;
   },
@@ -111,8 +134,18 @@ export const imagesApi = {
   // Dynamic URL for thumbnail src
   getThumbnail: (imageId: number) => {
     if (typeof window !== 'undefined') {
+      const protocol = window.location.protocol;
+      const hostname = window.location.hostname;
+      const port = window.location.port;
+      
+      // If standard ports or reverse proxy → no port
+      if (!port || port === '80' || port === '443') {
+        return `${protocol}//${hostname}/api/images/${imageId}/thumbnail`;
+      }
+      
+      // If custom port → use API port
       const apiPort = process.env.NEXT_PUBLIC_API_PORT || '8000';
-      return `${window.location.protocol}//${window.location.hostname}:${apiPort}/api/images/${imageId}/thumbnail`;
+      return `${protocol}//${hostname}:${apiPort}/api/images/${imageId}/thumbnail`;
     }
     return `http://localhost:8000/api/images/${imageId}/thumbnail`;
   },
@@ -256,12 +289,12 @@ export const queueApi = {
 // Settings API
 export const settingsApi = {
   get: async () => {
-    const { data } = await api.get('/api/settings');
+    const { data } = await api.get('/api/settings/');
     return data;
   },
   
   update: async (settings: any) => {
-    const { data } = await api.put('/api/settings', settings);
+    const { data } = await api.put('/api/settings/', settings);
     return data;
   },
   

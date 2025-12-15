@@ -35,8 +35,6 @@ import {
 import { toast } from 'sonner';
 import { ImageEditor } from './image-editor';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 interface ImageCardProps {
   image: ImageFile;
   selected: boolean;
@@ -53,9 +51,9 @@ function ImageCard({ image, selected, onToggle, onDelete, onPreview, onEdit }: I
   // Check if it's a PDF
   const isPdf = image.mimeType === 'application/pdf' || image.originalFilename.toLowerCase().endsWith('.pdf');
   
-  // Try thumbnail first, fall back to full image
-  const thumbnailUrl = `${API_URL}/api/images/${image.id}/thumbnail`;
-  const fallbackUrl = `${API_URL}/api/images/${image.id}`;
+  // Try thumbnail first, fall back to full image - USE DYNAMIC API
+  const thumbnailUrl = imagesApi.getThumbnail(image.id);
+  const fallbackUrl = imagesApi.get(image.id);
   
   // Use fallback if thumbnail failed
   const currentUrl = useFallback ? fallbackUrl : thumbnailUrl;
@@ -313,7 +311,7 @@ export function ImageGallery() {
       if (validIds.length === 1) {
         const imageId = validIds[0];
         const image = images.find(img => img.id === imageId);
-        const response = await fetch(`${API_URL}/api/images/${imageId}`);
+        const response = await fetch(imagesApi.get(imageId));
         const blob = await response.blob();
         
         const url = window.URL.createObjectURL(blob);
@@ -521,7 +519,7 @@ export function ImageGallery() {
                     </div>
                   ) : (
                     <img
-                      src={`${API_URL}/api/images/${previewImage.id}`}
+                      src={imagesApi.get(previewImage.id)}
                       alt={previewImage.originalFilename}
                       className="absolute inset-0 h-full w-full object-contain"
                     />

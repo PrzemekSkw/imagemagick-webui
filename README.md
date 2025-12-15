@@ -17,11 +17,13 @@
 
 **A modern, beautiful web interface for ImageMagick with AI-powered features**
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Screenshots](#-screenshots) • [Contributing](#-contributing)
+[Features](#-features) • [Quick Start](#-quick-start) • [Configuration](#%EF%B8%8F-configuration) • [Documentation](#-documentation) • [Contributing](#-contributing)
 
 </div>
 
-## 📽️  Video
+---
+
+## 📽️ Demo Video
 
 https://github.com/user-attachments/assets/53538ac9-8642-4c9b-972f-772c17efa9fa
 
@@ -63,79 +65,255 @@ https://github.com/user-attachments/assets/53538ac9-8642-4c9b-972f-772c17efa9fa
 ## 🚀 Quick Start
 
 ### Prerequisites
-- [Docker](https://docs.docker.com/get-docker/) 20.10+ and [Docker Compose](https://docs.docker.com/compose/install/) 2.0+
+- [Docker](https://docs.docker.com/get-docker/) 20.10+ 
+- [Docker Compose](https://docs.docker.com/compose/install/) 2.0+
 
-### Option 1: Using Docker Image (Recommended)
+---
+
+### Option 1: Quick Start (Recommended)
+
+**Perfect for:** Production use, quick testing
 ```bash
-# Create project directory
 mkdir imagemagick-webgui && cd imagemagick-webgui
-
-# Download docker-compose file
-curl -O https://raw.githubusercontent.com/PrzemekSkw/imagemagick-webui/main/docker-compose.example.yml
-mv docker-compose.example.yml docker-compose.yml
-
-# Start the application
+curl -O https://raw.githubusercontent.com/PrzemekSkw/imagemagick-webui/main/docker-compose.yml
 docker compose up -d
 ```
 
 **That's it!** Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+> ⚠️ **Production Note:** Change `SECRET_KEY` and `JWT_SECRET` in `docker-compose.yml` before deploying!
+
+---
+
 ### Option 2: Build from Source
+
+**Perfect for:** Development, customization, easy configuration
 ```bash
 git clone https://github.com/PrzemekSkw/imagemagick-webui.git
 cd imagemagick-webgui
 cp .env.example .env
+nano .env  # Optional: Edit settings
 docker compose up --build -d
 ```
 
-> ⚠️ **Important**: Change `SECRET_KEY` in docker-compose.yml before deploying to production!
-
-
-Open http://localhost:3000
-
-
-### Default Ports
-| Service | Port | Description |
-|---------|------|-------------|
-| Frontend | 3000 | Next.js web interface |
-| Backend | 8000 | FastAPI REST API |
-| PostgreSQL | 5432 | Database |
-| Redis | 6379 | Queue system |
+Open [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## 📖 Documentation
+## ⚙️ Configuration
 
-### Configuration
+### Option 1 Users (Without .env)
 
-Create a `.env` file in the project root (optional):
+Edit `docker-compose.yml` directly:
+```yaml
+environment:
+  - REQUIRE_LOGIN=false          # Set to true to require login
+  - ALLOW_REGISTRATION=true      # Allow new user registration
+  - SECRET_KEY=your_secret_here  # IMPORTANT: Change in production!
+  - DEFAULT_OUTPUT_FORMAT=webp   # Default output format
+  - DEFAULT_QUALITY=85           # JPEG/WebP quality (1-100)
+  - MAX_UPLOAD_SIZE_MB=100       # Maximum upload size
+```
 
+Then restart:
+```bash
+docker compose down
+docker compose up -d
+```
+
+---
+
+### Option 2 Users (With .env)
+
+Edit `.env` file:
 ```env
-# Database
-DATABASE_URL=postgresql+asyncpg://imagemagick:imagemagick@db:5432/imagemagick
+# Authentication
+REQUIRE_LOGIN=false
+ALLOW_REGISTRATION=true
 
-# Security
+# Security (CHANGE THESE!)
 SECRET_KEY=your-secret-key-change-in-production
-ACCESS_TOKEN_EXPIRE_MINUTES=60
+JWT_SECRET=your-jwt-secret-change-in-production
 
-# ImageMagick limits
-IMAGEMAGICK_TIMEOUT=60
+# Image Processing
+DEFAULT_OUTPUT_FORMAT=webp
+DEFAULT_QUALITY=85
+MAX_UPLOAD_SIZE_MB=100
+IMAGEMAGICK_TIMEOUT=300
 IMAGEMAGICK_MEMORY_LIMIT=2GB
-MAX_UPLOAD_SIZE=50MB
 
 # Optional: Google OAuth
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 ```
 
+Then restart:
+```bash
+docker compose down
+docker compose up -d
+```
+
+---
+
+## 🔧 Changing Ports
+
+## 🔧 Changing Ports
+
+### Option 1 Users (Downloaded docker-compose.yml)
+
+**Edit `docker-compose.yml` directly:**
+
+Find these 3 lines and change them:
+```yaml
+    build:
+      args:
+        NEXT_PUBLIC_API_PORT: "8012"  # ← Line 1: Change to your backend port
+    ports:
+      - "3012:3000"  # ← Line 2: Change left side (host port)
+      - "8012:8000"  # ← Line 3: Change left side (host port)
+    environment:
+      - NEXT_PUBLIC_API_PORT=8012  # ← Line 4: Must match backend host port
+```
+
+**Example: Use ports 3012 and 8012:**
+```yaml
+    build:
+      args:
+        NEXT_PUBLIC_API_PORT: "8012"
+    ports:
+      - "3012:3000"
+      - "8012:8000"
+    environment:
+      - NEXT_PUBLIC_API_PORT=8012
+```
+
+**Then rebuild:**
+```bash
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
+
+**Access:** `http://localhost:3012`
+
+---
+
+### Option 2 Users (Git clone with .env)
+
+**Edit `.env` file:**
+```env
+# Change these 3 variables
+FRONTEND_PORT=3012
+BACKEND_PORT=8012
+NEXT_PUBLIC_API_PORT=8012  # Must match BACKEND_PORT
+```
+
+**Then rebuild:**
+```bash
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
+
+**Access:** `http://localhost:3012`
+
+---
+
+### Important Notes
+
+1. **`NEXT_PUBLIC_API_PORT` must match your backend port!**
+   - If backend is on 8012 → set `NEXT_PUBLIC_API_PORT=8012`
+   
+2. **After changing ports, you MUST rebuild:**
+```bash
+   docker compose build --no-cache
+```
+   
+3. **Port format in docker-compose.yml:**
+```yaml
+   ports:
+     - "HOST_PORT:CONTAINER_PORT"
+```
+   - Change LEFT side (host) only
+   - RIGHT side (container) must stay 3000 and 8000
+
+---
+
+## 🌐 Access from Other Devices
+
+### Find Your Computer's IP:
+
+**Linux/Mac:**
+```bash
+hostname -I | awk '{print $1}'
+```
+
+**Windows:**
+```powershell
+ipconfig
+```
+
+### Access from Mobile/Tablet:
+```
+http://YOUR_IP:3000
+```
+
+Example: `http://192.168.1.105:3000`
+
+---
+
+## 🔒 Using with Reverse Proxy
+
+### Nginx Proxy Manager / Traefik / Caddy
+
+**The app works automatically behind any reverse proxy!**
+
+Simply point your reverse proxy to:
+- **Frontend:** `http://app_container:3000`
+- **Backend API:** `http://app_container:8000`
+
+**No special configuration needed** - CORS and hostname detection are handled automatically.
+
+### Example Nginx Config:
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+
+    location / {
+        proxy_pass http://app:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /api {
+        proxy_pass http://app:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+---
+
+## 📖 Documentation
+
+### Default Ports
+
+| Service | Port | Description |
+|---------|------|-------------|
+| Frontend | 3000 | Next.js web interface |
+| Backend | 8000 | FastAPI REST API |
+| PostgreSQL | 5432 | Database (internal) |
+| Redis | 6379 | Queue system (internal) |
+
 ### API Documentation
 
 Once running, access the interactive API docs:
-- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+- **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
 ### Architecture
-
 ```
 ┌─────────────────┐     ┌─────────────────┐
 │   Next.js 15    │────▶│    FastAPI      │
@@ -175,10 +353,9 @@ Once running, access the interactive API docs:
 | `watermark` | `text`, `position`, `font_size`, `opacity` | `{"text": "©2024", "position": "southeast"}` |
 | `format` | `format`, `quality` | `{"format": "webp", "quality": 85}` |
 
-### Terminal Mode Commands
+### Terminal Mode
 
 For advanced users, use Terminal Mode to run raw ImageMagick commands:
-
 ```bash
 # Convert to WebP with quality
 magick input.jpg -quality 80 output.webp
@@ -209,12 +386,6 @@ magick base.jpg overlay.png -composite output.jpg
 ### Dark Mode
 ![Dark Mode](docs/screenshots/darkmode.png)
 
-### Login Page
-![Login](docs/screenshots/login.png)
-
-### Register Page
-![Register](docs/screenshots/register.png)
-
 ### Settings
 ![Settings](docs/screenshots/settings.png)
 </details>
@@ -242,7 +413,6 @@ npm run dev
 ```
 
 ### Running Tests
-
 ```bash
 # Backend tests
 cd backend
@@ -254,7 +424,6 @@ npm test
 ```
 
 ### Project Structure
-
 ```
 imagemagick-webui/
 ├── backend/
@@ -284,7 +453,7 @@ imagemagick-webui/
 
 - **Command Whitelist** - Only allowed ImageMagick operations
 - **Input Validation** - Pydantic models for all inputs
-- **Resource Limits** - Memory (2GB), timeout (60s), disk limits
+- **Resource Limits** - Memory (2GB), timeout (300s), disk limits
 - **File Validation** - MIME type and extension checking
 - **Rate Limiting** - Configurable request limits
 - **Non-root Container** - Runs as unprivileged user
@@ -311,31 +480,25 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 💖 Support
 
-If you find this project useful, you can support its development:
+If you find this project useful, please consider supporting its development:
 
-**Support via BuyMeACoffee:**
+<div align="center">
 
 [![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://www.buymeacoffee.com/przemekskw)
 
-**Support via PayPal:**
-
-[![PayPal](https://img.shields.io/badge/PayPal-Donate-blue.svg)](https://paypal.me/przemekskw)
-
-**Support via GitHub Sponsors:**
+[![PayPal](https://img.shields.io/badge/PayPal-Donate-blue.svg?style=for-the-badge)](https://paypal.me/przemekskw)
 
 [![GitHub Sponsors](https://img.shields.io/github/sponsors/PrzemekSkw?style=for-the-badge&logo=github&color=ea4aaa)](https://github.com/sponsors/PrzemekSkw)
+
+</div>
 
 Your support helps maintain and improve this project. Thank you! ❤️
 
 ---
 
-## ⭐ Star on GitHub
+## ⭐ Star History
 
-If you find this project useful, please consider giving it a star on GitHub!
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=PrzemekSkw/imagemagick-webui&type=date&legend=top-left)](https://www.star-history.com/#PrzemekSkw/imagemagick-webui&type=date&legend=top-left)
+[![Star History Chart](https://api.star-history.com/svg?repos=PrzemekSkw/imagemagick-webui&type=Date)](https://star-history.com/#PrzemekSkw/imagemagick-webui&Date)
 
 ---
 
@@ -351,7 +514,6 @@ If you find this project useful, please consider giving it a star on GitHub!
 ---
 
 <div align="center">
-
 
 Made with ❤️ by [PrzemekSkw](https://github.com/PrzemekSkw)
 

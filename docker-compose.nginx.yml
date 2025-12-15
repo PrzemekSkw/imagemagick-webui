@@ -1,34 +1,42 @@
 services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - default
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_PORT: "${NEXT_PUBLIC_API_PORT:-8000}"
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
-      - "${BACKEND_PORT:-8000}:8000"
+    expose:
+      - "3000"
+      - "8000"
     env_file:
       - .env
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_PORT=${NEXT_PUBLIC_API_PORT:-8000}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
-      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://imagemagick:imagemagick@postgres:5432/imagemagick}
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
-      - SECRET_KEY=${SECRET_KEY:-CHANGE_THIS_supersecretkey_production_abc123}
-      - JWT_SECRET=${JWT_SECRET:-CHANGE_THIS_jwt_secret_production_xyz789}
+      - NEXT_PUBLIC_API_PORT=8000
+      - ALLOWED_ORIGINS=*
+      - DATABASE_URL=postgresql+asyncpg://imagemagick:imagemagick@postgres:5432/imagemagick
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-supersecretkey_change_in_production_2024}
+      - JWT_SECRET=${JWT_SECRET:-jwt_secret_key_change_this_in_production}
       - REQUIRE_LOGIN=${REQUIRE_LOGIN:-false}
       - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-true}
       - DEFAULT_OUTPUT_FORMAT=${DEFAULT_OUTPUT_FORMAT:-webp}
       - DEFAULT_QUALITY=${DEFAULT_QUALITY:-85}
       - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-100}
-      - IMAGEMAGICK_TIMEOUT=${IMAGEMAGICK_TIMEOUT:-300}
+      - IMAGEMAGICK_TIMEOUT=${IMAGEMAGICK_TIMEOUT:-30}
       - IMAGEMAGICK_MEMORY_LIMIT=${IMAGEMAGICK_MEMORY_LIMIT:-2GB}
       - HISTORY_RETENTION_HOURS=${HISTORY_RETENTION_HOURS:-24}
-      - TZ=${TZ:-UTC}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - TZ=UTC
     volumes:
       - uploads:/app/uploads
       - processed:/app/processed
@@ -44,11 +52,8 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-          cpus: '2'
+    networks:
+      - default
 
   postgres:
     image: postgres:16-alpine
@@ -64,6 +69,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - default
 
   redis:
     image: redis:7-alpine
@@ -76,6 +83,8 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - default
 
 volumes:
   postgres_data:

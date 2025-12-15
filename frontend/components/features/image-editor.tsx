@@ -26,12 +26,10 @@ import { useStore } from "@/lib/store";
 // Detect API URL dynamically
 const getApiUrl = () => {
   if (typeof window !== 'undefined') {
-    const envUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (envUrl) return envUrl;
-    const { protocol, hostname } = window.location;
-    return `${protocol}//${hostname}:8000`;
+    const apiPort = process.env.NEXT_PUBLIC_API_PORT || '8000';
+    return `${window.location.protocol}//${window.location.hostname}:${apiPort}`;
   }
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  return 'http://localhost:8000';
 };
 
 const API_URL = getApiUrl();
