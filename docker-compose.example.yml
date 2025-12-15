@@ -13,11 +13,7 @@
 
 services:
   app:
-    build:
-      context: https://github.com/PrzemekSkw/imagemagick-webui.git#main
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_PORT: "8000"
+    image: ghcr.io/przemekskw/imagemagick-webui:latest
     ports:
       - "3000:3000"  # ← CHANGE HERE: "HOST_PORT:3000" (e.g., "3012:3000")
       - "8000:8000"  # ← CHANGE HERE: "HOST_PORT:8000" (e.g., "8012:8000")
