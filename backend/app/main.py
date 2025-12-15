@@ -4,8 +4,10 @@ Production-ready API for image processing with ImageMagick
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -57,16 +59,36 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS middleware
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "*")
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
+
+logger.info(f"CORS allowed origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 # Gzip compression
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Request timeout middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+import asyncio
+
+class TimeoutMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        try:
+            return await asyncio.wait_for(call_next(request), timeout=300.0)
+        except asyncio.TimeoutError:
+            return Response("Request timeout", status_code=504)
+
+app.add_middleware(TimeoutMiddleware)
 
 
 # Include routers

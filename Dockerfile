@@ -5,8 +5,8 @@ FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
-# Set API URL for build time (will be accessed from browser)
-ENV NEXT_PUBLIC_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_API_PORT=8000
+ENV NEXT_PUBLIC_API_PORT=${NEXT_PUBLIC_API_PORT}
 
 # Install dependencies
 COPY frontend/package.json ./
