@@ -80,6 +80,8 @@ docker compose up -d
 
 Find and change these lines:
 ```yaml
+    args:
+      NEXT_PUBLIC_API_PORT: "8012"
     ports:
       - "3012:3000"  # ← Change "3012" to your desired frontend port
       - "8012:8000"  # ← Change "8012" to your desired backend port
