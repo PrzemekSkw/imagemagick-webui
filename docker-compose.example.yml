@@ -7,22 +7,17 @@
 # 2. Run: docker compose up -d
 # 3. Open: http://localhost:3000
 #
-# CHANGE PORTS (NO REBUILD NEEDED):
-# 1. Edit lines 28, 29, 31 (marked with ← CHANGE HERE)
-# 2. Run: docker compose down && docker compose up -d
 #
 # For more options see: docs/INSTALLATION.md
 # ============================================
 
 services:
   app:
-    image: przemekskw/imagemagick-webui:latest
-    # OR build from source:
-    # build:
-    #   context: .
-    #   dockerfile: Dockerfile
-    #   args:
-    #     NEXT_PUBLIC_API_PORT: "8000"  # ← CHANGE HERE if using custom port
+    build:
+      context: https://github.com/PrzemekSkw/imagemagick-webui.git#main
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_PORT: "8000"
     ports:
       - "3000:3000"  # ← CHANGE HERE: "HOST_PORT:3000" (e.g., "3012:3000")
       - "8000:8000"  # ← CHANGE HERE: "HOST_PORT:8000" (e.g., "8012:8000")
