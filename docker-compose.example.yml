@@ -7,10 +7,11 @@
 # 2. Run: docker compose up -d
 # 3. Open: http://localhost:3000
 #
-# CHANGE PORTS:
-# Edit lines 28, 29, 31 (marked with ← CHANGE HERE)
-# Then run: docker compose down && docker compose build --no-cache && docker compose up -d
+# CHANGE PORTS (NO REBUILD NEEDED):
+# 1. Edit lines 28, 29, 31 (marked with ← CHANGE HERE)
+# 2. Run: docker compose down && docker compose up -d
 #
+# For more options see: docs/INSTALLATION.md
 # ============================================
 
 services:

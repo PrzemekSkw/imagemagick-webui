@@ -1,167 +1,336 @@
-# Installation
+# Installation Guide
 
-## Prerequisites
-
-Before installing ImageMagick WebGUI, ensure you have:
-
-- **Docker** 20.10+ ([Install Docker](https://docs.docker.com/get-docker/))
-- **Docker Compose** 2.0+ ([Install Compose](https://docs.docker.com/compose/install/))
-
-### System Requirements
-
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| RAM | 2 GB | 4 GB (8 GB for AI features) |
-| CPU | 2 cores | 4 cores |
-| Disk | 5 GB | 10 GB |
-| Architecture | x86_64 (AMD/Intel) | x86_64 |
-
-> ⚠️ ARM architecture (Raspberry Pi, Apple Silicon) is not fully supported due to onnxruntime limitations.
+## Table of Contents
+- [Quick Start](#quick-start)
+- [Option 1: Pre-built Image](#option-1-pre-built-image-recommended)
+- [Option 2: Build from Source](#option-2-build-from-source)
+- [Changing Ports](#changing-ports)
+- [Configuration](#configuration)
+- [Reverse Proxy Setup](#reverse-proxy-setup)
+- [Production Deployment](#production-deployment)
 
 ---
 
-## Quick Install (Recommended)
+## Quick Start
 
-The easiest way to run ImageMagick WebGUI using the pre-built Docker image:
+The fastest way to get started:
 ```bash
-# Create directory
 mkdir imagemagick-webgui && cd imagemagick-webgui
-
-# Download docker-compose file
 curl -O https://raw.githubusercontent.com/PrzemekSkw/imagemagick-webui/main/docker-compose.example.yml
 mv docker-compose.example.yml docker-compose.yml
-
-# Start the application
 docker compose up -d
 ```
 
-**That's it!** Open http://localhost:3000
+Access: http://localhost:3000
 
 ---
 
-## Build from Source
+## Option 1: Pre-built Image (Recommended)
 
-If you want to modify the code or build locally:
+**Best for:** Production use, quick testing, no development
+
+**Steps:**
 ```bash
-# Clone repository
+mkdir imagemagick-webgui && cd imagemagick-webgui
+curl -O https://raw.githubusercontent.com/PrzemekSkw/imagemagick-webui/main/docker-compose.example.yml
+mv docker-compose.example.yml docker-compose.yml
+docker compose up -d
+```
+
+**Advantages:**
+- ✅ No build time (starts in ~30 seconds)
+- ✅ Smaller download
+- ✅ Production-ready
+
+**Default configuration:**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- No authentication required
+- 100MB max upload
+
+---
+
+## Option 2: Build from Source
+
+**Best for:** Development, customization, contributing
+
+**Steps:**
+```bash
 git clone https://github.com/PrzemekSkw/imagemagick-webui.git
 cd imagemagick-webgui
-
-# Copy environment file
 cp .env.example .env
+nano .env  # Optional: customize settings
+docker compose up -d
+```
 
-# Build and start (takes 5-10 minutes first time)
-docker compose up --build -d
+**Advantages:**
+- ✅ Full source code
+- ✅ Easy customization
+- ✅ Can contribute changes
+
+**Build time:** ~5-10 minutes (first time)
+
+---
+
+## Changing Ports
+
+### If using Option 1 (pre-built image):
+
+**Edit `docker-compose.yml`:**
+
+Find and change these lines:
+```yaml
+    ports:
+      - "3012:3000"  # ← Change "3012" to your desired frontend port
+      - "8012:8000"  # ← Change "8012" to your desired backend port
+    environment:
+      - NEXT_PUBLIC_API_PORT=8012  # ← MUST match backend port above
+```
+
+**Then restart:**
+```bash
+docker compose down
+docker compose up -d
+```
+
+**Note:** No rebuild needed when using pre-built image!
+
+---
+
+### If using Option 2 (built from source):
+
+**Edit `.env`:**
+```env
+FRONTEND_PORT=3012
+BACKEND_PORT=8012
+NEXT_PUBLIC_API_PORT=8012  # Must match BACKEND_PORT
+```
+
+**Then rebuild:**
+```bash
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
+
+**Why rebuild?** The `NEXT_PUBLIC_API_PORT` is baked into the frontend at build time.
+
+---
+
+## Configuration
+
+### Authentication
+
+**Enable login requirement:**
+```yaml
+# In docker-compose.yml:
+environment:
+  - REQUIRE_LOGIN=true
+  - ALLOW_REGISTRATION=false  # Disable new signups after creating admin
+```
+
+Restart: `docker compose restart`
+
+---
+
+### Image Processing Settings
+```yaml
+environment:
+  - DEFAULT_OUTPUT_FORMAT=avif     # avif, webp, jpeg, png
+  - DEFAULT_QUALITY=90             # 1-100
+  - MAX_UPLOAD_SIZE_MB=200         # Maximum file size
+  - IMAGEMAGICK_TIMEOUT=600        # Processing timeout (seconds)
 ```
 
 ---
 
-## Custom Ports
+### Security Keys (PRODUCTION REQUIRED!)
 
-If ports 3000 or 8000 are already in use, edit `docker-compose.yml`:
+**Generate secure keys:**
+```bash
+# Linux/Mac:
+openssl rand -hex 32
+
+# Or Python:
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+**Update docker-compose.yml:**
+```yaml
+environment:
+  - SECRET_KEY=your-generated-key-here
+  - JWT_SECRET=your-other-generated-key-here
+```
+
+---
+
+## Reverse Proxy Setup
+
+### Nginx Proxy Manager
+
+**Proxy Host - Details:**
+```
+Domain Names: example.com
+Scheme: http
+Forward Hostname/IP: YOUR_SERVER_IP
+Forward Port: 3000
+
+☑ Websockets Support
+☐ Cache Assets
+```
+
+**Custom Locations - Add `/api`:**
+```
+Location: /api
+Scheme: http
+Forward Hostname/IP: YOUR_SERVER_IP
+Forward Port: 8000
+
+Custom Nginx Configuration:
+client_max_body_size 100M;
+proxy_connect_timeout 300;
+proxy_send_timeout 300;
+proxy_read_timeout 300;
+```
+
+**SSL:**
+```
+☑ Force SSL
+☑ HTTP/2 Support
+☑ Request SSL Certificate
+```
+
+**Update CORS:**
+```yaml
+# In docker-compose.yml:
+environment:
+  - ALLOWED_ORIGINS=https://example.com
+```
+
+Restart: `docker compose restart`
+
+---
+
+### Traefik
+
+Add labels to docker-compose.yml:
 ```yaml
 services:
   app:
-    ports:
-      - "3016:3000"   # Frontend on port 3016
-      - "8016:8000"   # Backend on port 8016
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.imagemagick.rule=Host(`example.com`)"
+      - "traefik.http.routers.imagemagick.entrypoints=websecure"
+      - "traefik.http.routers.imagemagick.tls.certresolver=myresolver"
+      - "traefik.http.services.imagemagick.loadbalancer.server.port=3000"
 ```
 
 ---
 
-## Access from Phone/Tablet
+### Caddy
 
-The application automatically detects your IP address. To access from other devices on the same network:
+Create `Caddyfile`:
+```
+example.com {
+    reverse_proxy localhost:3000
+    
+    @api path /api/*
+    handle @api {
+        reverse_proxy localhost:8000
+    }
+}
+```
 
-1. Find your computer's IP:
+---
+
+## Production Deployment
+
+### Pre-deployment Checklist
+
+- [ ] Change `SECRET_KEY` to random 32+ character string
+- [ ] Change `JWT_SECRET` to random 32+ character string  
+- [ ] Set `REQUIRE_LOGIN=true`
+- [ ] Set `ALLOW_REGISTRATION=false` after creating admin
+- [ ] Configure `ALLOWED_ORIGINS` with your domain
+- [ ] Set up HTTPS via reverse proxy
+- [ ] Configure backups for Docker volumes
+- [ ] Test upload/download functionality
+- [ ] Monitor resource usage
+
+---
+
+### Backups
+
+**Backup volumes:**
 ```bash
-   # Linux/Mac
-   ip addr | grep "inet 192"
-   
-   # Windows
-   ipconfig
+docker run --rm \
+  -v imagemagick-webgui_postgres_data:/data \
+  -v $(pwd):/backup \
+  alpine tar czf /backup/postgres-backup-$(date +%Y%m%d).tar.gz -C /data .
 ```
 
-2. Open on phone: `http://192.168.x.x:3000`
+**Restore:**
+```bash
+docker run --rm \
+  -v imagemagick-webgui_postgres_data:/data \
+  -v $(pwd):/backup \
+  alpine tar xzf /backup/postgres-backup-20241215.tar.gz -C /data
+```
 
 ---
 
-## Updating
+### Updates
 
-To update to the latest version:
+**Option 1 (pre-built image):**
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
----
-
-## Uninstalling
-
-To completely remove the application:
+**Option 2 (built from source):**
 ```bash
-# Stop and remove containers
-docker compose down
-
-# Remove volumes (deletes all data!)
-docker compose down -v
-
-# Remove images
-docker rmi ghcr.io/przemekskw/imagemagick-webui:latest
-```
-
----
-
-## Local Development (without Docker)
-
-For development:
-
-**Backend:**
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# Start PostgreSQL and Redis via Docker:
-docker run -d --name postgres -e POSTGRES_PASSWORD=imagemagick -p 5432:5432 postgres:16-alpine
-docker run -d --name redis -p 6379:6379 redis:7-alpine
-
-# Run backend
-uvicorn app.main:app --reload --port 8000
-```
-
-**Frontend:**
-```bash
-cd frontend
-npm install
-npm run dev
+git pull
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ---
 
 ## Troubleshooting
 
-### Container won't start
-Check logs:
+### Port already in use
 ```bash
-docker compose logs app
+# Check what's using the port:
+sudo lsof -i :3000
+sudo lsof -i :8000
+
+# Change ports in docker-compose.yml
 ```
 
-### Database connection error
-Wait 30 seconds and try again - PostgreSQL needs time to initialize on first run.
-
-### Permission denied errors
-On Linux, you may need:
+### Upload fails
 ```bash
-sudo docker compose up -d
-```
+# Check logs:
+docker compose logs app | grep -i error
 
-### Out of memory
-Reduce ImageMagick memory limit in docker-compose.yml:
-```yaml
+# Increase upload size:
+# Edit docker-compose.yml:
 environment:
-  - IMAGEMAGICK_MEMORY_LIMIT=1GiB
+  - MAX_UPLOAD_SIZE_MB=500
 ```
 
-See [Troubleshooting](Troubleshooting) for more solutions.
+### Can't connect from other devices
+```bash
+# Check ALLOWED_ORIGINS:
+environment:
+  - ALLOWED_ORIGINS=*  # Allow all (testing only!)
+  # Or specific:
+  - ALLOWED_ORIGINS=https://example.com,http://192.168.1.100:3000
+```
+
+---
+
+## Support
+
+- 🐛 [Report Issues](https://github.com/PrzemekSkw/imagemagick-webui/issues)
+- 💬 [Discussions](https://github.com/PrzemekSkw/imagemagick-webui/discussions)
+- 📖 [Documentation](https://github.com/PrzemekSkw/imagemagick-webui/wiki)
