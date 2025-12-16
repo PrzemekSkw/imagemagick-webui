@@ -14,9 +14,30 @@ const getApiUrl = (): string => {
       return `${protocol}//${hostname}`;
     }
     
-    // If custom port (like localhost:3012) → use API port
-    const apiPort = process.env.NEXT_PUBLIC_API_PORT || '8000';
-    return `${protocol}//${hostname}:${apiPort}`;
+    const frontendPort = parseInt(port);
+    
+    // Default port (3000) → use configured API port
+    if (frontendPort === 3000) {
+      const apiPort = process.env.NEXT_PUBLIC_API_PORT || '8000';
+      return `${protocol}//${hostname}:${apiPort}`;
+    }
+    
+    // Custom ports: intelligent mapping
+    // Pattern: 3XXX → 8XXX (e.g., 3012→8012, 3015→8015, 3080→8080)
+    let calculatedApiPort;
+    
+    if (frontendPort >= 3000 && frontendPort < 4000) {
+      // 3000-3999 maps to 8000-8999
+      calculatedApiPort = 8000 + (frontendPort - 3000);
+    } else if (frontendPort >= 5000 && frontendPort < 6000) {
+      // 5000-5999 maps to 9000-9999
+      calculatedApiPort = 9000 + (frontendPort - 5000);
+    } else {
+      // Fallback to configured API port
+      calculatedApiPort = process.env.NEXT_PUBLIC_API_PORT || '8000';
+    }
+    
+    return `${protocol}//${hostname}:${calculatedApiPort}`;
   }
   
   // Server-side rendering - use env or localhost
@@ -114,40 +135,14 @@ export const imagesApi = {
   
   // Dynamic URL for image src
   get: (imageId: number) => {
-    if (typeof window !== 'undefined') {
-      const protocol = window.location.protocol;
-      const hostname = window.location.hostname;
-      const port = window.location.port;
-      
-      // If standard ports or reverse proxy → no port
-      if (!port || port === '80' || port === '443') {
-        return `${protocol}//${hostname}/api/images/${imageId}`;
-      }
-      
-      // If custom port → use API port
-      const apiPort = process.env.NEXT_PUBLIC_API_PORT || '8000';
-      return `${protocol}//${hostname}:${apiPort}/api/images/${imageId}`;
-    }
-    return `http://localhost:8000/api/images/${imageId}`;
+    const apiUrl = getApiUrl();
+    return `${apiUrl}/api/images/${imageId}`;
   },
   
   // Dynamic URL for thumbnail src
   getThumbnail: (imageId: number) => {
-    if (typeof window !== 'undefined') {
-      const protocol = window.location.protocol;
-      const hostname = window.location.hostname;
-      const port = window.location.port;
-      
-      // If standard ports or reverse proxy → no port
-      if (!port || port === '80' || port === '443') {
-        return `${protocol}//${hostname}/api/images/${imageId}/thumbnail`;
-      }
-      
-      // If custom port → use API port
-      const apiPort = process.env.NEXT_PUBLIC_API_PORT || '8000';
-      return `${protocol}//${hostname}:${apiPort}/api/images/${imageId}/thumbnail`;
-    }
-    return `http://localhost:8000/api/images/${imageId}/thumbnail`;
+    const apiUrl = getApiUrl();
+    return `${apiUrl}/api/images/${imageId}/thumbnail`;
   },
   
   getInfo: async (imageId: number) => {
