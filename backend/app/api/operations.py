@@ -998,6 +998,11 @@ async def download_direct(
     Process image and return file directly for download.
     Does not save to database - just processes and streams file.
     """
+    # Validate output format
+    allowed_formats = {'webp', 'png', 'jpg', 'jpeg', 'gif', 'avif', 'tiff', 'bmp'}
+    if request.output_format.lower() not in allowed_formats:
+        raise HTTPException(status_code=400, detail="Invalid output format")
+    
     from pathlib import Path
     from fastapi.responses import FileResponse
     from app.services.file_service import file_service
@@ -1019,8 +1024,10 @@ async def download_direct(
     # Build operations
     operations = [op.model_dump() for op in request.operations]
     
+    # Sanitize output format
+    actual_output_format = request.output_format.lower().replace('/', '').replace('\\', '').replace('..', '')
+    
     # For PDF input, force image output since ImageMagick rasterizes PDFs
-    actual_output_format = request.output_format
     is_pdf_input = validated_input_path.lower().endswith('.pdf') or (image.mime_type and 'pdf' in image.mime_type.lower())
     if is_pdf_input:
         actual_output_format = 'png'  # PDF is rasterized, output as PNG
