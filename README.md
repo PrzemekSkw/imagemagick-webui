@@ -72,7 +72,7 @@ docker compose up -d
 
 **Access:** http://localhost:3000
 
-> 📖 **Need custom ports, authentication, or reverse proxy?** See [Installation Guide](wiki/Installation.md)
+> 📖 **Need custom ports, authentication, or reverse proxy?** See [Installation Guide](docs/wiki/Installation.md)
 
 > ⚠️ **Production:** Change `SECRET_KEY` and `JWT_SECRET` in docker-compose.yml before deploying!
 
