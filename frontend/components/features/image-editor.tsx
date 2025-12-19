@@ -23,16 +23,8 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 
-// Detect API URL dynamically
-const getApiUrl = () => {
-  if (typeof window !== 'undefined') {
-    const apiPort = process.env.NEXT_PUBLIC_API_PORT || '8000';
-    return `${window.location.protocol}//${window.location.hostname}:${apiPort}`;
-  }
-  return 'http://localhost:8000';
-};
-
-const API_URL = getApiUrl();
+// Import proper API URL function
+import { getApiUrl } from '@/lib/api';
 
 // Helper to get auth headers
 const getAuthHeaders = (): HeadersInit => {
@@ -109,8 +101,8 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
   // For PDF, use preview endpoint
   const [imageSrc, setImageSrc] = useState(
     isPdf 
-      ? `${API_URL}/api/images/${image.id}/preview?t=${Date.now()}`
-      : `${API_URL}/api/images/${image.id}?t=${Date.now()}`
+      ? `${getApiUrl()}/api/images/${image.id}/preview?t=${Date.now()}`
+      : `${getApiUrl()}/api/images/${image.id}?t=${Date.now()}`
   );
   
   // Filename editing
@@ -186,7 +178,7 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
     }
     
     try {
-      const response = await fetch(`${API_URL}/api/images/${currentImageId}/rename`, {
+      const response = await fetch(`${getApiUrl()}/api/images/${currentImageId}/rename`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify({ new_name: newName }),
@@ -352,7 +344,7 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
     };
     
     try {
-      const res = await fetch(`${API_URL}/api/operations/process-sync`, {
+      const res = await fetch(`${getApiUrl()}/api/operations/process-sync`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -365,7 +357,7 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
       if (res.ok) {
         const data = await res.json();
         setCurrentImageId(data.image_id);
-        setImageSrc(`${API_URL}${data.image_url}?t=${Date.now()}`);
+        setImageSrc(`${getApiUrl()}${data.image_url}?t=${Date.now()}`);
         setCropArea(null);
         setCropMode(false);
         toast.success("Crop applied!");
@@ -397,7 +389,7 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
     setProcessingMessage("Saving changes...");
     
     try {
-      const res = await fetch(`${API_URL}/api/operations/process-sync`, {
+      const res = await fetch(`${getApiUrl()}/api/operations/process-sync`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -410,7 +402,7 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
       if (res.ok) {
         const data = await res.json();
         setCurrentImageId(data.image_id);
-        setImageSrc(`${API_URL}${data.image_url}?t=${Date.now()}`);
+        setImageSrc(`${getApiUrl()}${data.image_url}?t=${Date.now()}`);
         // Reset state since changes are now baked in
         setState({ ...defaultState });
         setSavedState({ ...defaultState });
@@ -531,7 +523,7 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
     setProcessingMessage("Processing and downloading...");
     
     try {
-      const res = await fetch(`${API_URL}/api/operations/download-direct`, {
+      const res = await fetch(`${getApiUrl()}/api/operations/download-direct`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -586,7 +578,7 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
       const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 min timeout
       
       // Use sync endpoint for immediate result
-      const res = await fetch(`${API_URL}/api/operations/remove-background-sync`, {
+      const res = await fetch(`${getApiUrl()}/api/operations/remove-background-sync`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({ image_id: currentImageId, alpha_matting: false }),
@@ -599,7 +591,7 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
         const data = await res.json();
         if (data.success && data.image_url) {
           setCurrentImageId(data.image_id);
-          setImageSrc(`${API_URL}${data.image_url}?t=${Date.now()}`);
+          setImageSrc(`${getApiUrl()}${data.image_url}?t=${Date.now()}`);
           toast.success("Background removed!");
         } else {
           toast.error("No result returned");
@@ -627,7 +619,7 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
     setProcessingMessage("Enhancing...");
     
     try {
-      const res = await fetch(`${API_URL}/api/operations/process-sync`, {
+      const res = await fetch(`${getApiUrl()}/api/operations/process-sync`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -644,7 +636,7 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
       if (res.ok) {
         const data = await res.json();
         setCurrentImageId(data.image_id);
-        setImageSrc(`${API_URL}${data.image_url}?t=${Date.now()}`);
+        setImageSrc(`${getApiUrl()}${data.image_url}?t=${Date.now()}`);
         toast.success("Image enhanced!");
       } else {
         toast.error("Enhancement failed");
@@ -664,7 +656,7 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
     setProcessingMessage(`Upscaling ${scale}x... This may take a moment`);
     
     try {
-      const res = await fetch(`${API_URL}/api/operations/upscale`, {
+      const res = await fetch(`${getApiUrl()}/api/operations/upscale`, {
         method: "POST",
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -678,7 +670,7 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
         const data = await res.json();
         if (data.success && data.image_url) {
           setCurrentImageId(data.image_id);
-          setImageSrc(`${API_URL}${data.image_url}?t=${Date.now()}`);
+          setImageSrc(`${getApiUrl()}${data.image_url}?t=${Date.now()}`);
           toast.success(`Upscaled to ${data.new_size.width}x${data.new_size.height}!`);
         } else {
           toast.error("Upscale failed", { description: data.detail || "Unknown error" });
