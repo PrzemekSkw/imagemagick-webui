@@ -1036,8 +1036,11 @@ async def download_direct(
     original_name = Path(image.original_filename).stem
     output_filename = f"edited_{original_name}.{actual_output_format}"
     
-    # Use temp directory for output (already in allowed dirs)
-    output_path = os.path.join(tempfile.gettempdir(), f"download_{uuid.uuid4().hex}.{actual_output_format}")
+    temp_filename = f"download_{uuid.uuid4().hex}.{actual_output_format}"
+    output_path = os.path.join(tempfile.gettempdir(), temp_filename)
+
+    # SECURITY: Validate output path to prevent path traversal
+    validated_output_path = validate_path(output_path)
     
     # Build and execute command
     command = await imagemagick_service.build_command(
@@ -1048,8 +1051,9 @@ async def download_direct(
     
     success, stdout, stderr = await imagemagick_service.execute(command)
     
-    if not success or not Path(output_path).exists():
-        raise HTTPException(status_code=500, detail=f"Processing failed: {stderr}")
+    if not success or not Path(validated_output_path).exists():
+    raise HTTPException(status_code=500, detail=f"Processing failed: {stderr}")
+
     
     # Get MIME type
     mime_types = {
@@ -1062,15 +1066,16 @@ async def download_direct(
     media_type = mime_types.get(actual_output_format, "application/octet-stream")
     
     # Return file for download
+    # SECURITY: Use validated path to prevent path traversal
     return FileResponse(
-        path=output_path,
+        path=validated_output_path,
         filename=output_filename,
         media_type=media_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{output_filename}"'
-        },
-        background=None  # Don't delete file until response is sent
-    )
+        "Content-Disposition": f'attachment; filename="{output_filename}"'
+       },
+       background=None  # Don't delete file until response is sent
+)
 
 
 # ============== AI DIAGNOSTICS ==============

@@ -15,8 +15,8 @@ services:
   app:
     image: ghcr.io/przemekskw/imagemagick-webui:latest
     ports:
-  - "3000:3000"  # Frontend - change to "3012:3000" for custom port
-  - "8000:8000"  # Backend - change to "8012:8000" for custom port
+    - "3000:3000"  # Frontend - change to "3012:3000" for custom port
+    - "8000:8000"  # Backend - change to "8012:8000" for custom port
     environment:
       - NODE_ENV=production
       # Auto-detected! Only change if using reverse proxy with custom routing
