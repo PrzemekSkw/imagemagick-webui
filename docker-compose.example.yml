@@ -19,7 +19,7 @@ services:
   - "8000:8000"  # Backend - change to "8012:8000" for custom port
     environment:
       - NODE_ENV=production
-      # ⚠️ Auto-detected! Only change if using reverse proxy with custom routing
+      # Auto-detected! Only change if using reverse proxy with custom routing
       - NEXT_PUBLIC_API_PORT=8000  # ← CHANGE HERE to match backend HOST_PORT above
       - ALLOWED_ORIGINS=*
       
