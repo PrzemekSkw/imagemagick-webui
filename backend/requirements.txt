@@ -14,7 +14,7 @@ asyncpg>=0.29.0,<1.0.0
 alembic>=1.13.0,<2.0.0
 
 # Redis and task queue
-redis>=5.0.0,<8.0.0
+redis>=7.4.0,<8.0.0
 rq>=1.16.0,<3.0.0
 
 # Validation and serialization
