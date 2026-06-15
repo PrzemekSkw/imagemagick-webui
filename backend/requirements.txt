@@ -23,7 +23,7 @@ pydantic-settings>=2.1.0,<3.0.0
 email-validator>=2.1.0,<3.0.0
 
 # ImageMagick Python bindings
-Wand>=0.6.13,<1.0.0
+Wand>=0.7.1,<1.0.0
 
 # File handling
 aiofiles>=23.2.0,<26.0.0
