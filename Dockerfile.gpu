@@ -1,0 +1,143 @@
+# ============================================
+# Dockerfile.gpu — GPU-enabled build (latest-gpu)
+# CPU "latest" stays light; this image adds CUDA 12 + cuDNN 9 for rembg.
+# Base verified: onnxruntime-gpu (PyPI default CUDA 12.x since 1.19)
+# requires CUDA 12.* AND cuDNN 9.* — the -cudnn- tag bundles cuDNN 9.
+# ============================================
+
+# ---- STAGE 1: Frontend Builder (identical to CPU Dockerfile) ----
+FROM node:26-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+
+ARG NEXT_PUBLIC_API_PORT=8000
+ENV NEXT_PUBLIC_API_PORT=${NEXT_PUBLIC_API_PORT}
+
+COPY frontend/package.json ./
+RUN npm install --legacy-peer-deps
+
+COPY frontend/ ./
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+RUN npm run build
+
+# ---- STAGE 2: Python deps (CUDA base so onnxruntime-gpu links correctly) ----
+# CUDA 12.6 + cuDNN 9 runtime on Ubuntu 24.04 (Python 3.12 from deadsnakes).
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04 AS python-deps
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Python 3.12 to match the CPU image exactly (onnxruntime supports <=3.12).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    gcc \
+    libpq-dev \
+    libmagic-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3.12 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# GPU requirements: same as CPU but swap onnxruntime -> onnxruntime-gpu.
+COPY backend/requirements-gpu.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements-gpu.txt
+
+# ---- STAGE 3: Final GPU production image ----
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04 AS production
+
+LABEL maintainer="ImageMagick WebGUI"
+LABEL description="GPU-enabled ImageMagick WebGUI (CUDA 12 + cuDNN 9, rembg/BiRefNet on GPU)"
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    NODE_ENV=production \
+    NUMBA_CACHE_DIR=/tmp/numba_cache \
+    NUMBA_DISABLE_JIT=1 \
+    MPLCONFIGDIR=/tmp/matplotlib \
+    # Signal to the app that this image is GPU-capable.
+    GPU_ENABLED=true
+
+WORKDIR /app
+
+# Runtime deps: Python 3.12 + ImageMagick + Node 20 + tini.
+# NOTE: cuDNN 9 and CUDA 12 libs come from the base image — do NOT reinstall them.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    && add-apt-repository -y ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3.12-venv \
+    imagemagick \
+    libmagickwand-dev \
+    ghostscript \
+    poppler-utils \
+    libpq5 \
+    libmagic1 \
+    curl \
+    tini \
+    ca-certificates \
+    gnupg \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Configure ImageMagick policy (identical to CPU image).
+RUN POLICY_FILE=$(find /etc -name "policy.xml" -path "*ImageMagick*" 2>/dev/null | head -1) && \
+    if [ -n "$POLICY_FILE" ] && [ -f "$POLICY_FILE" ]; then \
+    echo "Found policy file: $POLICY_FILE"; \
+    sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' "$POLICY_FILE"; \
+    sed -i 's/rights="none" pattern="PS"/rights="read|write" pattern="PS"/' "$POLICY_FILE"; \
+    sed -i 's/rights="none" pattern="EPS"/rights="read|write" pattern="EPS"/' "$POLICY_FILE"; \
+    sed -i 's/<policy domain="resource" name="memory" value="[^"]*"\/>/<policy domain="resource" name="memory" value="2GiB"\/>/' "$POLICY_FILE"; \
+    sed -i 's/<policy domain="resource" name="disk" value="[^"]*"\/>/<policy domain="resource" name="disk" value="4GiB"\/>/' "$POLICY_FILE"; \
+    sed -i 's/<policy domain="resource" name="width" value="[^"]*"\/>/<policy domain="resource" name="width" value="16KP"\/>/' "$POLICY_FILE"; \
+    sed -i 's/<policy domain="resource" name="height" value="[^"]*"\/>/<policy domain="resource" name="height" value="16KP"\/>/' "$POLICY_FILE"; \
+    fi
+
+RUN convert -version && identify -version
+
+COPY --from=python-deps /opt/venv /opt/venv
+
+COPY --from=frontend-builder /app/frontend/.next/standalone ./frontend/.next/standalone
+COPY --from=frontend-builder /app/frontend/.next/static ./frontend/.next/standalone/.next/static
+COPY --from=frontend-builder /app/frontend/public ./frontend/.next/standalone/public
+
+COPY backend/ ./backend/
+
+RUN groupadd -r appuser && useradd -r -g appuser -m -d /home/appuser appuser
+
+RUN mkdir -p /app/uploads /app/processed /tmp/imagemagick /tmp/numba_cache /tmp/matplotlib /home/appuser/.u2net && \
+    chown -R appuser:appuser /app /tmp/imagemagick /tmp/numba_cache /tmp/matplotlib /home/appuser
+
+ENV HOME=/home/appuser \
+    U2NET_HOME=/home/appuser/.u2net
+
+# Pre-download the default GPU model. BiRefNet-general gives the precise edges
+# that justify GPU; isnet kept as a lighter fallback.
+RUN python3.12 -c "from rembg import new_session; new_session('birefnet-general')" || echo "birefnet model download failed, will retry at runtime"
+RUN python3.12 -c "from rembg import new_session; new_session('isnet-general-use')" || echo "isnet model download failed, will retry at runtime"
+RUN chown -R appuser:appuser /home/appuser/.u2net || true
+
+COPY scripts/start.sh /start.sh
+RUN chmod +x /start.sh
+
+USER appuser
+
+EXPOSE 3000 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3000/api/health && curl -f http://localhost:8000/health || exit 1
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["/start.sh"]
