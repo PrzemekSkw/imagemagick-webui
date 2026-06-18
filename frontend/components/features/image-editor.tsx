@@ -1241,7 +1241,7 @@ export function ImageEditor({ image, onClose, onSave }: ImageEditorProps) {
                         <Eraser className="h-5 w-5 text-primary" />
                         <div>
                           <h4 className="font-medium text-sm">Remove Background</h4>
-                          <p className="text-xs text-muted-foreground">AI-powered (isnet model)</p>
+                          <p className="text-xs text-muted-foreground">AI-powered background removal</p>
                         </div>
                       </div>
                       <Button className="w-full" onClick={handleRemoveBackground} disabled={isUpscaling || isRemovingBg || isEnhancing}>
