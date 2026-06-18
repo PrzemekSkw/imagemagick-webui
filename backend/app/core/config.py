@@ -50,6 +50,16 @@ class Settings(BaseSettings):
     # Set to a low number (e.g. 2) on shared/weak VPS to limit CPU usage.
     onnx_threads: int = 0
     
+    # AI / GPU acceleration (v1.1.0)
+    # Set to true automatically by Dockerfile.gpu (ENV GPU_ENABLED=true).
+    # On the CPU image this stays false and CUDA is never attempted.
+    gpu_enabled: bool = False
+    # Force CPU even on the GPU image (debugging / fallback). Overrides gpu_enabled.
+    force_cpu: bool = False
+    # Per-session GPU memory cap (bytes) for the CUDA execution provider.
+    # 2 GiB matches the ImageMagick memory policy; tune per card.
+    cuda_gpu_mem_limit: int = 2 * 1024 * 1024 * 1024
+    
     # Security
     rate_limit: str = "100/minute"
     require_login: bool = True  # If True, users must login to use the app
@@ -66,7 +76,7 @@ class Settings(BaseSettings):
     # History retention
     history_retention_hours: int = 24
     
-    @field_validator('require_login', 'allow_registration', mode='before')
+    @field_validator('require_login', 'allow_registration', 'gpu_enabled', 'force_cpu', mode='before')
     @classmethod
     def parse_bool(cls, v):
         """Parse boolean from various string formats"""
