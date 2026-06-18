@@ -56,9 +56,12 @@ class Settings(BaseSettings):
     gpu_enabled: bool = False
     # Force CPU even on the GPU image (debugging / fallback). Overrides gpu_enabled.
     force_cpu: bool = False
-    # Per-session GPU memory cap (bytes) for the CUDA execution provider.
-    # 2 GiB matches the ImageMagick memory policy; tune per card.
-    cuda_gpu_mem_limit: int = 2 * 1024 * 1024 * 1024
+    # GPU memory arena cap (bytes) for the CUDA execution provider.
+    # 0 (default) = no fixed cap; onnxruntime grows the arena dynamically up to
+    # whatever the card has. Required for large models like BiRefNet — a low cap
+    # causes "Available memory of 0 is smaller than requested bytes". Set a
+    # positive value only to hard-cap the arena when sharing the card.
+    cuda_gpu_mem_limit: int = 0
     
     # Security
     rate_limit: str = "100/minute"

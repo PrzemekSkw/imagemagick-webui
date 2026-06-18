@@ -106,10 +106,16 @@ class AIService:
             cuda_opts = {
                 "device_id": 0,
                 "arena_extend_strategy": "kNextPowerOfTwo",
-                "gpu_mem_limit": int(settings.cuda_gpu_mem_limit),
                 "cudnn_conv_algo_search": "HEURISTIC",
                 "do_copy_in_default_stream": True,
             }
+            # Only cap arena memory if a positive limit is configured. 0 (default)
+            # lets onnxruntime grow the GPU arena dynamically up to whatever the
+            # card has — needed for large models like BiRefNet. A too-low fixed
+            # limit causes "Available memory of 0 is smaller than requested bytes".
+            mem_limit = int(settings.cuda_gpu_mem_limit)
+            if mem_limit > 0:
+                cuda_opts["gpu_mem_limit"] = mem_limit
             return [("CUDAExecutionProvider", cuda_opts), "CPUExecutionProvider"]
 
         return ["CPUExecutionProvider"]
