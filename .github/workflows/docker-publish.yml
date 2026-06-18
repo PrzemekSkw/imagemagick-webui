@@ -35,6 +35,8 @@ jobs:
 
       # ---- CPU image (default, lightweight) ----
       # Tags: latest, X.Y.Z, X.Y  -> what users without a GPU pull.
+      # "latest" is enabled on a push to main OR on a version tag release, so a
+      # release (which is a tag push, not a branch push) also updates latest.
       - name: Extract metadata (CPU)
         id: meta_cpu
         uses: docker/metadata-action@v6
@@ -43,7 +45,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Build and push CPU image
         uses: docker/build-push-action@v7
@@ -59,9 +61,8 @@ jobs:
       # ---- GPU image (CUDA + cuDNN, large) ----
       # Tags: latest-gpu, X.Y.Z-gpu, X.Y-gpu  -> opt-in only. Never pulled by
       # default, so non-GPU users don't download the multi-GB CUDA image.
-      # NOTE: the "-gpu" suffix on semver tags comes from flavor.suffix. The
-      # "latest-gpu" tag is declared explicitly via type=raw, because flavor's
-      # onlatest does NOT apply to an explicit type=raw,value=latest tag.
+      # flavor.suffix=-gpu adds "-gpu" to the semver tags; "latest-gpu" is set
+      # explicitly (suffix= empties the per-tag suffix) under the same condition.
       - name: Extract metadata (GPU)
         id: meta_gpu
         uses: docker/metadata-action@v6
@@ -73,7 +74,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest-gpu,enable={{is_default_branch}},suffix=
+            type=raw,value=latest-gpu,suffix=,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Build and push GPU image
         uses: docker/build-push-action@v7
