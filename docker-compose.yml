@@ -52,6 +52,74 @@ services:
           memory: 4G
           cpus: '2'
 
+  # GPU variant (v1.1.0). Run with: docker compose --profile gpu up --build
+  # Requires NVIDIA Container Toolkit on the host
+  # Shares postgres/redis/volumes with the CPU "app" service. Do not run both
+  # at once unless you change the ports below (same 3000/8000 by design).
+  app-gpu:
+    profiles: ["gpu"]
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+      args:
+        NEXT_PUBLIC_API_PORT: "${NEXT_PUBLIC_API_PORT:-8000}"
+    image: imagemagick-webui:latest-gpu
+    runtime: nvidia
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+      - "${BACKEND_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_PORT=${NEXT_PUBLIC_API_PORT:-8000}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://imagemagick:imagemagick@postgres:5432/imagemagick}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - SECRET_KEY=${SECRET_KEY:-CHANGE_THIS_supersecretkey_production_abc123}
+      - JWT_SECRET=${JWT_SECRET:-CHANGE_THIS_jwt_secret_production_xyz789}
+      - REQUIRE_LOGIN=${REQUIRE_LOGIN:-true}
+      - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-true}
+      - DEFAULT_OUTPUT_FORMAT=${DEFAULT_OUTPUT_FORMAT:-webp}
+      - DEFAULT_QUALITY=${DEFAULT_QUALITY:-85}
+      - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-100}
+      - IMAGEMAGICK_TIMEOUT=${IMAGEMAGICK_TIMEOUT:-300}
+      - IMAGEMAGICK_MEMORY_LIMIT=${IMAGEMAGICK_MEMORY_LIMIT:-2GB}
+      - HISTORY_RETENTION_HOURS=${HISTORY_RETENTION_HOURS:-24}
+      - REMBG_MODEL=${REMBG_MODEL:-isnet-general-use}
+      - ONNX_THREADS=${ONNX_THREADS:-0}
+      - TZ=${TZ:-UTC}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GPU_ENABLED=true
+      - FORCE_CPU=${FORCE_CPU:-false}
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - uploads:/app/uploads
+      - processed:/app/processed
+      - temp:/tmp/imagemagick
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
   postgres:
     image: postgres:16-alpine
     environment:
