@@ -3,6 +3,7 @@ File handling service for uploads and downloads
 """
 
 import os
+import re
 import uuid
 import zipfile
 import aiofiles
@@ -200,6 +201,35 @@ class FileService:
         
         return count
     
+    # Whitelist of output formats. Anything else is rejected outright, which
+    # prevents a crafted format string from escaping the processed directory.
+    ALLOWED_OUTPUT_FORMATS = frozenset({
+        "webp", "jpg", "jpeg", "png", "avif", "gif", "tiff", "bmp",
+    })
+
+    @staticmethod
+    def _safe_stem(filename: str) -> str:
+        """Reduce an arbitrary filename to a safe stem with no path components."""
+        stem = Path(Path(filename).name).stem
+        stem = re.sub(r"[^A-Za-z0-9_-]", "_", stem)
+        return stem[:100] or "file"
+
+    @classmethod
+    def _safe_format(cls, format: str) -> str:
+        """Reject any output format outside the whitelist."""
+        fmt = str(format).strip().lower().lstrip(".")
+        if fmt not in cls.ALLOWED_OUTPUT_FORMATS:
+            raise ValueError(f"Unsupported output format: {format!r}")
+        return fmt
+
+    def _ensure_within(self, candidate: Path, root: Path) -> str:
+        """Final guard: the fully resolved path must stay inside root."""
+        resolved = os.path.realpath(str(candidate))
+        root_resolved = os.path.realpath(str(root))
+        if not (resolved == root_resolved or resolved.startswith(root_resolved + os.sep)):
+            raise ValueError("Resolved path escapes the allowed directory")
+        return resolved
+
     def get_output_path(
         self,
         filename: str,
@@ -207,17 +237,18 @@ class FileService:
         user_id: Optional[int] = None
     ) -> str:
         """Generate output path for processed file"""
-        base_name = Path(filename).stem
-        output_name = f"{base_name}_{uuid.uuid4().hex[:8]}.{format}"
-        
+        base_name = self._safe_stem(filename)
+        fmt = self._safe_format(format)
+        output_name = f"{base_name}_{uuid.uuid4().hex[:8]}.{fmt}"
+
         if user_id:
             output_dir = self.processed_dir / str(user_id)
         else:
             output_dir = self.processed_dir / "anonymous"
-        
+
         output_dir.mkdir(parents=True, exist_ok=True)
-        
-        return str(output_dir / output_name)
+
+        return self._ensure_within(output_dir / output_name, self.processed_dir)
     
     async def get_processed_path(
         self,
@@ -225,23 +256,26 @@ class FileService:
         user_id: Optional[int] = None
     ) -> str:
         """Generate output path for AI processed file (async version)"""
-        # Extract base name and extension
-        path = Path(filename)
-        base = path.stem
-        ext = path.suffix if path.suffix else '.png'
-        
+        base = self._safe_stem(filename)
+
+        raw_ext = Path(Path(filename).name).suffix.lstrip(".").lower()
+        try:
+            ext = self._safe_format(raw_ext)
+        except ValueError:
+            ext = "png"
+
         # ALWAYS add unique suffix to prevent duplicates
         unique_id = uuid.uuid4().hex[:8]
-        output_name = f"{base}_{unique_id}{ext}"
-        
+        output_name = f"{base}_{unique_id}.{ext}"
+
         if user_id:
             output_dir = self.processed_dir / str(user_id)
         else:
             output_dir = self.processed_dir / "anonymous"
-        
+
         output_dir.mkdir(parents=True, exist_ok=True)
-        
-        return str(output_dir / output_name)
+
+        return self._ensure_within(output_dir / output_name, self.processed_dir)
 
 
 # Singleton instance
