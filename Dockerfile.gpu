@@ -22,7 +22,7 @@ RUN npm run build
 
 # ---- STAGE 2: Python deps (CUDA base so onnxruntime-gpu links correctly) ----
 # CUDA 12.6 + cuDNN 9 runtime on Ubuntu 24.04 (Python 3.12 from deadsnakes).
-FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04 AS python-deps
+FROM nvidia/cuda:12.9.2-cudnn-runtime-ubuntu24.04 AS python-deps
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -48,7 +48,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements-gpu.txt
 
 # ---- STAGE 3: Final GPU production image ----
-FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04 AS production
+FROM nvidia/cuda:12.9.2-cudnn-runtime-ubuntu24.04 AS production
 
 LABEL maintainer="ImageMagick WebGUI"
 LABEL description="GPU-enabled ImageMagick WebGUI (CUDA 12 + cuDNN 9, rembg/BiRefNet on GPU)"
