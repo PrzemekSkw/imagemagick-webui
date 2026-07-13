@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# The suite only needs to read the code it is testing.
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend tests
