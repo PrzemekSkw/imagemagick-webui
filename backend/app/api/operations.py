@@ -4,7 +4,7 @@ Operations API for image processing
 
 import os
 import shlex
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,6 +58,10 @@ def validate_path(file_path: str) -> str:
     return abs_path
 
 
+# Allowed output formats (whitelist prevents path traversal via format string)
+OutputFormat = Literal["webp", "jpg", "jpeg", "png", "avif"]
+
+
 # Request models
 class ResizeParams(BaseModel):
     width: Optional[int] = None
@@ -96,19 +100,19 @@ class Operation(BaseModel):
 class ProcessRequest(BaseModel):
     image_ids: List[int]
     operations: List[Operation]
-    output_format: str = "webp"
+    output_format: OutputFormat = "webp"
     quality: int = Field(85, ge=1, le=100)
 
 
 class RawCommandRequest(BaseModel):
     image_ids: List[int]
     command: str
-    output_format: str = "png"
+    output_format: OutputFormat = "png"
 
 
 class PreviewCommandRequest(BaseModel):
     operations: List[Operation]
-    output_format: str = "webp"
+    output_format: OutputFormat = "webp"
     quality: int = 85
 
 
@@ -418,7 +422,7 @@ class LivePreviewRequest(BaseModel):
 
 class RemoveBackgroundRequest(BaseModel):
     image_ids: List[int]
-    output_format: str = "png"
+    output_format: OutputFormat = "png"
     alpha_matting: bool = False
 
 
@@ -831,7 +835,7 @@ async def get_ai_capabilities():
 class ProcessSyncRequest(BaseModel):
     image_id: int
     operations: List[Operation]
-    output_format: str = "jpg"
+    output_format: OutputFormat = "jpg"
 
 
 @router.post("/process-sync")
@@ -979,7 +983,7 @@ async def process_sync(
 class DownloadDirectRequest(BaseModel):
     image_id: int
     operations: List[Operation]
-    output_format: str = "webp"
+    output_format: OutputFormat = "webp"
     quality: int = 85
 
 
