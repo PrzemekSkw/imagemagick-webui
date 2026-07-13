@@ -28,7 +28,7 @@ Pillow>=10.2.0,<13.0.0
 
 # AI Background Removal — GPU
 rembg>=2.0.76,<2.0.77
-onnxruntime-gpu>=1.16.0,<1.25.0
+onnxruntime-gpu>=1.26.0,<1.27.0
 pymatting>=1.1.15,<2.0.0
 scipy>=1.18.0,<2.0.0
 
