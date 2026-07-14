@@ -46,5 +46,5 @@ pytest>=9.1.1,<10.0.0
 pytest-asyncio>=1.4.0,<1.5.0
 
 # Utilities
-python-dotenv>=1.0.0,<2.0.0
+python-dotenv>=1.2.2,<2.0.0
 orjson>=3.9.0,<4.0.0
