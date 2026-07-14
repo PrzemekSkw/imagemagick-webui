@@ -17,7 +17,7 @@ redis>=7.4.0,<8.0.0
 rq>=1.16.0,<3.0.0
 
 pydantic>=2.6.0,<3.0.0
-pydantic-settings>=2.1.0,<3.0.0
+pydantic-settings>=2.14.2,<3.0.0
 email-validator>=2.1.0,<3.0.0
 
 Wand>=0.7.1,<1.0.0
