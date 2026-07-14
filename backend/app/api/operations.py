@@ -15,6 +15,7 @@ import uuid
 from app.core.database import get_db
 from app.core.security import get_current_user_or_enforce
 from app.core.config import settings
+from app.core.paths import validate_path
 from app.models.user import User
 from app.models.image import Image
 from app.models.job import Job, JobStatus
@@ -25,37 +26,6 @@ from app.workers.tasks import process_images, process_raw_command
 router = APIRouter()
 
 
-# Security: Path validation
-ALLOWED_DIRS = [
-    os.path.realpath(settings.upload_dir),
-    os.path.realpath(settings.processed_dir),
-    os.path.realpath(settings.temp_dir),
-    '/app/uploads',
-    '/app/processed',
-    '/tmp'
-]
-
-
-def validate_path(file_path: str) -> str:
-    """
-    Validate that a file path is within allowed directories.
-    Prevents path traversal attacks.
-    """
-    if not file_path:
-        raise HTTPException(status_code=400, detail="Invalid file path")
-    
-    abs_path = os.path.realpath(file_path)
-    
-    is_allowed = any(
-        abs_path.startswith(os.path.realpath(allowed_dir))
-        for allowed_dir in ALLOWED_DIRS
-        if allowed_dir and os.path.exists(os.path.dirname(allowed_dir) or '/')
-    )
-    
-    if not is_allowed:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    return abs_path
 
 
 # Allowed output formats (whitelist prevents path traversal via format string)
@@ -1004,7 +974,6 @@ async def download_direct(
     from pathlib import Path
     from fastapi.responses import FileResponse
     from app.services.file_service import file_service
-    import tempfile
     
     user_id = current_user.id if current_user else None
     
@@ -1029,7 +998,11 @@ async def download_direct(
     output_filename = f"edited_{original_name}.{actual_output_format}"
     
     temp_filename = f"download_{uuid.uuid4().hex}.{actual_output_format}"
-    output_path = os.path.join(tempfile.gettempdir(), temp_filename)
+    # settings.temp_dir rather than tempfile.gettempdir(): the download lands
+    # inside the directory the cleanup job sweeps, and /tmp at large no longer
+    # needs to sit on the path whitelist.
+    os.makedirs(settings.temp_dir, exist_ok=True)
+    output_path = os.path.join(settings.temp_dir, temp_filename)
 
     validated_output_path = validate_path(output_path)
     
