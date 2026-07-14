@@ -19,6 +19,7 @@ import re
 from app.core.database import get_db
 from app.core.security import get_current_user, get_current_user_or_enforce, get_current_user_optional, get_current_user_optional
 from app.core.config import settings
+from app.core.paths import validate_path
 from app.models.user import User
 from app.models.image import Image
 from app.services.file_service import file_service
@@ -28,41 +29,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# Security: Path validation
-ALLOWED_DIRS = [
-    os.path.realpath(settings.upload_dir),
-    os.path.realpath(settings.processed_dir),
-    os.path.realpath(settings.temp_dir),
-    '/app/uploads',
-    '/app/processed',
-    '/tmp'
-]
-
-
-def validate_path(file_path: str) -> str:
-    """
-    Validate that a file path is within allowed directories.
-    Prevents path traversal attacks.
-    Returns the validated absolute path or raises HTTPException.
-    """
-    if not file_path:
-        raise HTTPException(status_code=400, detail="Invalid file path")
-    
-    # Resolve to absolute path
-    abs_path = os.path.realpath(file_path)
-    
-    # Check if path is within allowed directories
-    is_allowed = any(
-        abs_path.startswith(os.path.realpath(allowed_dir))
-        for allowed_dir in ALLOWED_DIRS
-        if allowed_dir and os.path.exists(os.path.dirname(allowed_dir) or '/')
-    )
-    
-    if not is_allowed:
-        logger.warning(f"Path traversal attempt blocked: {file_path} -> {abs_path}")
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    return abs_path
 
 
 # Response models

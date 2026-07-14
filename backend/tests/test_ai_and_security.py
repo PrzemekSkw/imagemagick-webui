@@ -40,11 +40,17 @@ class TestPathValidation:
     
     def test_accepts_allowed_dir(self):
         """A path inside an allowed dir must pass and return a realpath"""
-        from app.api.operations import validate_path
-        
-        result = validate_path("/tmp/some_generated_file.png")
+        import os
+
+        from app.core.config import settings
+        from app.core.paths import validate_path
+
+        # settings.temp_dir, not bare /tmp: the whitelist covers the directories
+        # the app actually owns, so an unrelated file in /tmp is now rejected.
+        target = os.path.join(settings.temp_dir, "some_generated_file.png")
+        result = validate_path(target)
         assert isinstance(result, str)
-        assert result.startswith("/tmp")
+        assert result == os.path.realpath(target)
 
 
 class TestAIConfiguration:
