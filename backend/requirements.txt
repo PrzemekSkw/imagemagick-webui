@@ -25,7 +25,7 @@ email-validator>=2.1.0,<3.0.0
 Wand>=0.7.1,<1.0.0
 
 # File handling
-aiofiles>=23.2.0,<26.0.0
+aiofiles>=25.1.0,<26.0.0
 python-magic>=0.4.27,<1.0.0
 # IMPORTANT: Pillow 12 requires Python 3.14, pin to 11.x for Python 3.12
 Pillow>=10.2.0,<13.0.0

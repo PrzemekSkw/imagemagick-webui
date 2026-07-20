@@ -22,7 +22,7 @@ email-validator>=2.1.0,<3.0.0
 
 Wand>=0.7.1,<1.0.0
 
-aiofiles>=23.2.0,<26.0.0
+aiofiles>=25.1.0,<26.0.0
 python-magic>=0.4.27,<1.0.0
 Pillow>=10.2.0,<13.0.0
 
