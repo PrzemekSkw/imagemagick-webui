@@ -32,9 +32,14 @@ services:
       - JWT_SECRET=CHANGE_THIS_jwt_secret_production_xyz789
       
       # Authentication
-      - REQUIRE_LOGIN=false  # Set to true to require login
-      - ALLOW_REGISTRATION=true  # Set to false to disable new signups
-      
+      # Secure defaults: login required, self-service signup OFF. Only relax
+      # these on a trusted, non-internet-facing network.
+      - REQUIRE_LOGIN=true  # Set to false ONLY on a trusted private network
+      - ALLOW_REGISTRATION=false  # Set to true to allow self-service signup
+      # Terminal / raw ImageMagick command mode. Safe by design (shell=False +
+      # token allowlist), but you can disable it entirely on hardened installs.
+      - ENABLE_RAW_MODE=true  # Set to false to disable the terminal feature
+
       # Image Processing
       - DEFAULT_OUTPUT_FORMAT=webp
       - DEFAULT_QUALITY=85

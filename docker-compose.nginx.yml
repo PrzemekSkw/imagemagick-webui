@@ -28,8 +28,9 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-supersecretkey_change_in_production_2024}
       - JWT_SECRET=${JWT_SECRET:-jwt_secret_key_change_this_in_production}
-      - REQUIRE_LOGIN=${REQUIRE_LOGIN:-false}
-      - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-true}
+      - REQUIRE_LOGIN=${REQUIRE_LOGIN:-true}
+      - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-false}
+      - ENABLE_RAW_MODE=${ENABLE_RAW_MODE:-true}
       - DEFAULT_OUTPUT_FORMAT=${DEFAULT_OUTPUT_FORMAT:-webp}
       - DEFAULT_QUALITY=${DEFAULT_QUALITY:-85}
       - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-100}
