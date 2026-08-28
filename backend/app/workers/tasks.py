@@ -139,25 +139,27 @@ def process_raw_command(
             asyncio.set_event_loop(loop)
             
             try:
-                # Build command from raw input (async)
-                command, error = loop.run_until_complete(
-                    imagemagick_service.build_raw_command(
+                # Build an ARGV LIST from raw input and run it with shell=False.
+                # No shell means no newline/;/&/| injection is possible; every
+                # token is also checked against a strict allowlist.
+                argv, error = loop.run_until_complete(
+                    imagemagick_service.build_raw_argv(
                         input_path,
                         output_path,
                         raw_command
                     )
                 )
-                
+
                 if error:
                     results["failed"].append({
                         "file": input_path,
                         "error": error
                     })
                     continue
-                
-                # Execute command
+
+                # Execute command (shell=False)
                 success, stdout, stderr = loop.run_until_complete(
-                    imagemagick_service.execute(command)
+                    imagemagick_service.execute_argv(argv)
                 )
             finally:
                 loop.close()

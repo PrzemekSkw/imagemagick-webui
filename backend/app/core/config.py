@@ -67,6 +67,12 @@ class Settings(BaseSettings):
     rate_limit: str = "100/minute"
     require_login: bool = True  # If True, users must login to use the app
     allow_registration: bool = True  # If False, only admins can create users
+    # Terminal / raw command mode (POST /api/operations/raw). When False the
+    # endpoint returns 403 and the feature is fully off. When True the raw path
+    # runs ImageMagick via an argv list with shell=False and a strict per-token
+    # allowlist (no shell, so newline/;/&/| injection is impossible). Turn it off
+    # entirely for hardened / internet-facing deployments.
+    enable_raw_mode: bool = True
     
     # Default processing settings
     default_output_format: str = "webp"
@@ -79,7 +85,7 @@ class Settings(BaseSettings):
     # History retention
     history_retention_hours: int = 24
     
-    @field_validator('require_login', 'allow_registration', 'gpu_enabled', 'force_cpu', mode='before')
+    @field_validator('require_login', 'allow_registration', 'enable_raw_mode', 'gpu_enabled', 'force_cpu', mode='before')
     @classmethod
     def parse_bool(cls, v):
         """Parse boolean from various string formats"""

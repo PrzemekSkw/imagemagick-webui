@@ -68,6 +68,39 @@ class ImageMagickService:
         r"\\x",  # Hex escape sequences
     ]
     
+    # Flags permitted in raw/terminal mode. This is defense-in-depth ON TOP OF
+    # shell=False: even without it the argv execution below makes OS command
+    # injection impossible, but the allowlist also blocks ImageMagick-native
+    # abuse (arbitrary file read/write via -write, -draw 'image', @file, etc.).
+    # Note: -limit is intentionally NOT here so a user cannot raise the memory /
+    # time caps we prepend ourselves.
+    ALLOWED_RAW_FLAGS = {
+        "-resize", "-crop", "-repage", "+repage", "-rotate", "-flip", "-flop",
+        "-transpose", "-transverse", "-quality", "-format", "-strip", "-thumbnail",
+        "-sample", "-scale", "-adaptive-resize", "-extent", "-trim", "-shave",
+        "-border", "-frame", "-blur", "-gaussian-blur", "-sharpen", "-unsharp",
+        "-emboss", "-edge", "-charcoal", "-sketch", "-colorspace", "-sepia-tone",
+        "-negate", "-modulate", "-brightness-contrast", "-colorize", "-tint",
+        "-gamma", "-level", "-auto-level", "-auto-gamma", "-normalize", "-enhance",
+        "-auto-orient", "-deskew", "-despeckle", "-median", "-depth", "-alpha",
+        "-background", "-flatten", "-density", "-gravity", "-pointsize", "-fill",
+        "-annotate", "-bordercolor", "-fuzz", "-transparent", "-monochrome",
+        "-contrast", "-equalize", "-type", "-compress", "-quantize", "-colors",
+        "-dither", "+dither", "-antialias", "+antialias", "-rotate",
+    }
+
+    # A token is a flag only if it starts with - or + FOLLOWED BY a letter.
+    # This keeps geometry like "+10+10" and negative numbers like "-5" as values.
+    _RAW_FLAG_RE = re.compile(r"^[-+][a-zA-Z]")
+
+    # Protocol / coder prefixes and path patterns ImageMagick treats specially;
+    # they can read or write arbitrary files or fetch URLs. Always rejected.
+    _RAW_TOKEN_BLOCKLIST = re.compile(
+        r"(?:^@|@/|ephemeral:|msl:|mvg:|url:|https?:|ftp:|file:|label:|caption:|"
+        r"pango:|text:|inline:|xc:@|/dev/|/proc/|/sys/|/etc/|\.\./)",
+        re.IGNORECASE,
+    )
+
     # Allowed input formats
     ALLOWED_INPUT_FORMATS = {
         "jpg", "jpeg", "png", "webp", "gif", "svg", "tiff", "tif",
@@ -378,7 +411,126 @@ class ImageMagickService:
             command = command.replace("convert ", f"convert {limits} ", 1)
         
         return command, ""
-    
+
+    def _validate_raw_token(self, token: str) -> Tuple[bool, str]:
+        """Validate a single token from a raw/terminal command."""
+        # Absolute paths and special coder/protocol prefixes are never allowed
+        # for user-supplied tokens (the real input/output paths are appended
+        # separately and never go through this check).
+        if token.startswith("/") or self._RAW_TOKEN_BLOCKLIST.search(token):
+            return False, f"Disallowed token in raw command: {token!r}"
+        # Anything that looks like a flag must be on the allowlist.
+        if self._RAW_FLAG_RE.match(token) and token not in self.ALLOWED_RAW_FLAGS:
+            return False, f"Flag not allowed in raw command: {token!r}"
+        return True, ""
+
+    async def build_raw_argv(
+        self,
+        input_path: str,
+        output_path: str,
+        raw_command: str,
+    ) -> Tuple[List[str], str]:
+        """
+        Build an ARGV LIST (not a shell string) from raw/terminal input.
+
+        The list is executed with shell=False, so no shell metacharacter -
+        newline, ;, &, |, $, >, backtick - can ever start a second command.
+        Every token is additionally checked against a strict allowlist.
+        Returns (argv, error_message); argv is empty when error_message is set.
+        """
+        magick_cmd = await self._get_magick_cmd()
+
+        try:
+            tokens = shlex.split(raw_command)
+        except ValueError as exc:
+            return [], f"Could not parse command: {exc}"
+
+        # Drop a leading 'magick'/'convert' the user may have typed; we add our own.
+        if tokens and tokens[0] in ("magick", "convert"):
+            tokens = tokens[1:]
+
+        argv: List[str] = [
+            magick_cmd,
+            "-limit", "memory", str(self.memory_limit),
+            "-limit", "time", str(self.timeout),
+        ]
+
+        saw_input = saw_output = False
+        for token in tokens:
+            if token == "{input}":
+                argv.append(input_path)
+                saw_input = True
+                continue
+            if token == "{output}":
+                argv.append(output_path)
+                saw_output = True
+                continue
+
+            ok, error = self._validate_raw_token(token)
+            if not ok:
+                return [], error
+            argv.append(token)
+
+        if not saw_input:
+            return [], "Command must contain the {input} placeholder"
+        if not saw_output:
+            return [], "Command must contain the {output} placeholder"
+
+        return argv, ""
+
+    def _run_argv_sync(self, argv: List[str]) -> Tuple[bool, str, str]:
+        """Execute an argv list with shell=False in a clean environment."""
+        import logging
+        import os
+        import signal
+        logger = logging.getLogger(__name__)
+
+        clean_env = {
+            'PATH': '/usr/local/bin:/usr/bin:/bin',
+            'HOME': '/tmp',
+            'TMPDIR': '/tmp',
+            'MAGICK_TEMPORARY_PATH': '/tmp',
+            'LC_ALL': 'C',
+        }
+
+        def preexec():
+            os.setsid()
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
+            signal.signal(signal.SIGTERM, signal.SIG_DFL)
+
+        try:
+            logger.debug(f"Executing argv: {argv}")
+            result = subprocess.run(
+                argv,
+                shell=False,
+                capture_output=True,
+                timeout=self.timeout,
+                cwd=str(self.temp_dir),
+                env=clean_env,
+                preexec_fn=preexec,
+                close_fds=True,
+            )
+            success = result.returncode == 0
+            stdout_str = result.stdout.decode('utf-8', errors='replace')
+            stderr_str = result.stderr.decode('utf-8', errors='replace')
+            if not success:
+                logger.warning(f"Command failed (exit {result.returncode}): {stderr_str}")
+            return success, stdout_str, stderr_str
+        except subprocess.TimeoutExpired:
+            logger.error(f"Command timed out after {self.timeout}s")
+            return False, "", f"Command timed out after {self.timeout} seconds"
+        except Exception as exc:
+            logger.exception(f"Command execution error: {exc}")
+            return False, "", str(exc)
+
+    async def execute_argv(self, argv: List[str]) -> Tuple[bool, str, str]:
+        """Execute an argv list (shell=False) in a worker thread."""
+        import concurrent.futures
+
+        loop = asyncio.get_event_loop()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            return await loop.run_in_executor(executor, self._run_argv_sync, argv)
+
     def _run_command_sync(self, command: str) -> Tuple[bool, str, str]:
         """
         Synchronous command execution in a clean environment.

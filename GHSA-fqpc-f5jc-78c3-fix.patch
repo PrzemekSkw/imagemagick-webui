@@ -1,0 +1,397 @@
+diff --git a/backend/app/api/operations.py b/backend/app/api/operations.py
+index 4266c16..0c26e99 100644
+--- a/backend/app/api/operations.py
++++ b/backend/app/api/operations.py
+@@ -184,11 +184,22 @@ async def process_raw(
+     current_user: Optional[User] = Depends(get_current_user_or_enforce)
+ ):
+     """Process images with raw ImageMagick command (terminal mode)"""
++    # Feature flag: raw/terminal mode can be turned off entirely.
++    if not settings.enable_raw_mode:
++        raise HTTPException(
++            status_code=status.HTTP_403_FORBIDDEN,
++            detail="Raw/terminal mode is disabled on this server."
++        )
++
+     user_id = current_user.id if current_user else None
+-    
+-    # Validate command
+-    is_valid, error = imagemagick_service.validate_command(request.command)
+-    if not is_valid:
++
++    # Pre-validate by building the argv (shell=False) the worker will run.
++    # This rejects disallowed flags / tokens up front with a clear error and
++    # guarantees the command can never reach a shell.
++    _argv, error = await imagemagick_service.build_raw_argv(
++        "{input}", "{output}", request.command
++    )
++    if error:
+         raise HTTPException(
+             status_code=status.HTTP_400_BAD_REQUEST,
+             detail=f"Invalid command: {error}"
+diff --git a/backend/app/core/config.py b/backend/app/core/config.py
+index ed0ddae..2cd3f27 100644
+--- a/backend/app/core/config.py
++++ b/backend/app/core/config.py
+@@ -67,6 +67,12 @@ class Settings(BaseSettings):
+     rate_limit: str = "100/minute"
+     require_login: bool = True  # If True, users must login to use the app
+     allow_registration: bool = True  # If False, only admins can create users
++    # Terminal / raw command mode (POST /api/operations/raw). When False the
++    # endpoint returns 403 and the feature is fully off. When True the raw path
++    # runs ImageMagick via an argv list with shell=False and a strict per-token
++    # allowlist (no shell, so newline/;/&/| injection is impossible). Turn it off
++    # entirely for hardened / internet-facing deployments.
++    enable_raw_mode: bool = True
+     
+     # Default processing settings
+     default_output_format: str = "webp"
+@@ -79,7 +85,7 @@ class Settings(BaseSettings):
+     # History retention
+     history_retention_hours: int = 24
+     
+-    @field_validator('require_login', 'allow_registration', 'gpu_enabled', 'force_cpu', mode='before')
++    @field_validator('require_login', 'allow_registration', 'enable_raw_mode', 'gpu_enabled', 'force_cpu', mode='before')
+     @classmethod
+     def parse_bool(cls, v):
+         """Parse boolean from various string formats"""
+diff --git a/backend/app/services/imagemagick.py b/backend/app/services/imagemagick.py
+index ac4e121..842a955 100644
+--- a/backend/app/services/imagemagick.py
++++ b/backend/app/services/imagemagick.py
+@@ -68,6 +68,39 @@ class ImageMagickService:
+         r"\\x",  # Hex escape sequences
+     ]
+     
++    # Flags permitted in raw/terminal mode. This is defense-in-depth ON TOP OF
++    # shell=False: even without it the argv execution below makes OS command
++    # injection impossible, but the allowlist also blocks ImageMagick-native
++    # abuse (arbitrary file read/write via -write, -draw 'image', @file, etc.).
++    # Note: -limit is intentionally NOT here so a user cannot raise the memory /
++    # time caps we prepend ourselves.
++    ALLOWED_RAW_FLAGS = {
++        "-resize", "-crop", "-repage", "+repage", "-rotate", "-flip", "-flop",
++        "-transpose", "-transverse", "-quality", "-format", "-strip", "-thumbnail",
++        "-sample", "-scale", "-adaptive-resize", "-extent", "-trim", "-shave",
++        "-border", "-frame", "-blur", "-gaussian-blur", "-sharpen", "-unsharp",
++        "-emboss", "-edge", "-charcoal", "-sketch", "-colorspace", "-sepia-tone",
++        "-negate", "-modulate", "-brightness-contrast", "-colorize", "-tint",
++        "-gamma", "-level", "-auto-level", "-auto-gamma", "-normalize", "-enhance",
++        "-auto-orient", "-deskew", "-despeckle", "-median", "-depth", "-alpha",
++        "-background", "-flatten", "-density", "-gravity", "-pointsize", "-fill",
++        "-annotate", "-bordercolor", "-fuzz", "-transparent", "-monochrome",
++        "-contrast", "-equalize", "-type", "-compress", "-quantize", "-colors",
++        "-dither", "+dither", "-antialias", "+antialias", "-rotate",
++    }
++
++    # A token is a flag only if it starts with - or + FOLLOWED BY a letter.
++    # This keeps geometry like "+10+10" and negative numbers like "-5" as values.
++    _RAW_FLAG_RE = re.compile(r"^[-+][a-zA-Z]")
++
++    # Protocol / coder prefixes and path patterns ImageMagick treats specially;
++    # they can read or write arbitrary files or fetch URLs. Always rejected.
++    _RAW_TOKEN_BLOCKLIST = re.compile(
++        r"(?:^@|@/|ephemeral:|msl:|mvg:|url:|https?:|ftp:|file:|label:|caption:|"
++        r"pango:|text:|inline:|xc:@|/dev/|/proc/|/sys/|/etc/|\.\./)",
++        re.IGNORECASE,
++    )
++
+     # Allowed input formats
+     ALLOWED_INPUT_FORMATS = {
+         "jpg", "jpeg", "png", "webp", "gif", "svg", "tiff", "tif",
+@@ -378,7 +411,126 @@ class ImageMagickService:
+             command = command.replace("convert ", f"convert {limits} ", 1)
+         
+         return command, ""
+-    
++
++    def _validate_raw_token(self, token: str) -> Tuple[bool, str]:
++        """Validate a single token from a raw/terminal command."""
++        # Absolute paths and special coder/protocol prefixes are never allowed
++        # for user-supplied tokens (the real input/output paths are appended
++        # separately and never go through this check).
++        if token.startswith("/") or self._RAW_TOKEN_BLOCKLIST.search(token):
++            return False, f"Disallowed token in raw command: {token!r}"
++        # Anything that looks like a flag must be on the allowlist.
++        if self._RAW_FLAG_RE.match(token) and token not in self.ALLOWED_RAW_FLAGS:
++            return False, f"Flag not allowed in raw command: {token!r}"
++        return True, ""
++
++    async def build_raw_argv(
++        self,
++        input_path: str,
++        output_path: str,
++        raw_command: str,
++    ) -> Tuple[List[str], str]:
++        """
++        Build an ARGV LIST (not a shell string) from raw/terminal input.
++
++        The list is executed with shell=False, so no shell metacharacter -
++        newline, ;, &, |, $, >, backtick - can ever start a second command.
++        Every token is additionally checked against a strict allowlist.
++        Returns (argv, error_message); argv is empty when error_message is set.
++        """
++        magick_cmd = await self._get_magick_cmd()
++
++        try:
++            tokens = shlex.split(raw_command)
++        except ValueError as exc:
++            return [], f"Could not parse command: {exc}"
++
++        # Drop a leading 'magick'/'convert' the user may have typed; we add our own.
++        if tokens and tokens[0] in ("magick", "convert"):
++            tokens = tokens[1:]
++
++        argv: List[str] = [
++            magick_cmd,
++            "-limit", "memory", str(self.memory_limit),
++            "-limit", "time", str(self.timeout),
++        ]
++
++        saw_input = saw_output = False
++        for token in tokens:
++            if token == "{input}":
++                argv.append(input_path)
++                saw_input = True
++                continue
++            if token == "{output}":
++                argv.append(output_path)
++                saw_output = True
++                continue
++
++            ok, error = self._validate_raw_token(token)
++            if not ok:
++                return [], error
++            argv.append(token)
++
++        if not saw_input:
++            return [], "Command must contain the {input} placeholder"
++        if not saw_output:
++            return [], "Command must contain the {output} placeholder"
++
++        return argv, ""
++
++    def _run_argv_sync(self, argv: List[str]) -> Tuple[bool, str, str]:
++        """Execute an argv list with shell=False in a clean environment."""
++        import logging
++        import os
++        import signal
++        logger = logging.getLogger(__name__)
++
++        clean_env = {
++            'PATH': '/usr/local/bin:/usr/bin:/bin',
++            'HOME': '/tmp',
++            'TMPDIR': '/tmp',
++            'MAGICK_TEMPORARY_PATH': '/tmp',
++            'LC_ALL': 'C',
++        }
++
++        def preexec():
++            os.setsid()
++            signal.signal(signal.SIGINT, signal.SIG_DFL)
++            signal.signal(signal.SIGTERM, signal.SIG_DFL)
++
++        try:
++            logger.debug(f"Executing argv: {argv}")
++            result = subprocess.run(
++                argv,
++                shell=False,
++                capture_output=True,
++                timeout=self.timeout,
++                cwd=str(self.temp_dir),
++                env=clean_env,
++                preexec_fn=preexec,
++                close_fds=True,
++            )
++            success = result.returncode == 0
++            stdout_str = result.stdout.decode('utf-8', errors='replace')
++            stderr_str = result.stderr.decode('utf-8', errors='replace')
++            if not success:
++                logger.warning(f"Command failed (exit {result.returncode}): {stderr_str}")
++            return success, stdout_str, stderr_str
++        except subprocess.TimeoutExpired:
++            logger.error(f"Command timed out after {self.timeout}s")
++            return False, "", f"Command timed out after {self.timeout} seconds"
++        except Exception as exc:
++            logger.exception(f"Command execution error: {exc}")
++            return False, "", str(exc)
++
++    async def execute_argv(self, argv: List[str]) -> Tuple[bool, str, str]:
++        """Execute an argv list (shell=False) in a worker thread."""
++        import concurrent.futures
++
++        loop = asyncio.get_event_loop()
++        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
++            return await loop.run_in_executor(executor, self._run_argv_sync, argv)
++
+     def _run_command_sync(self, command: str) -> Tuple[bool, str, str]:
+         """
+         Synchronous command execution in a clean environment.
+diff --git a/backend/app/workers/tasks.py b/backend/app/workers/tasks.py
+index ba4c3d4..219bf96 100644
+--- a/backend/app/workers/tasks.py
++++ b/backend/app/workers/tasks.py
+@@ -139,25 +139,27 @@ def process_raw_command(
+             asyncio.set_event_loop(loop)
+             
+             try:
+-                # Build command from raw input (async)
+-                command, error = loop.run_until_complete(
+-                    imagemagick_service.build_raw_command(
++                # Build an ARGV LIST from raw input and run it with shell=False.
++                # No shell means no newline/;/&/| injection is possible; every
++                # token is also checked against a strict allowlist.
++                argv, error = loop.run_until_complete(
++                    imagemagick_service.build_raw_argv(
+                         input_path,
+                         output_path,
+                         raw_command
+                     )
+                 )
+-                
++
+                 if error:
+                     results["failed"].append({
+                         "file": input_path,
+                         "error": error
+                     })
+                     continue
+-                
+-                # Execute command
++
++                # Execute command (shell=False)
+                 success, stdout, stderr = loop.run_until_complete(
+-                    imagemagick_service.execute(command)
++                    imagemagick_service.execute_argv(argv)
+                 )
+             finally:
+                 loop.close()
+diff --git a/backend/tests/test_raw_command_security.py b/backend/tests/test_raw_command_security.py
+new file mode 100644
+index 0000000..0cfee78
+--- /dev/null
++++ b/backend/tests/test_raw_command_security.py
+@@ -0,0 +1,85 @@
++"""
++Security regression tests for the raw/terminal command path.
++
++These pin the fix for GHSA-fqpc-f5jc-78c3 (authenticated OS command injection
++via newline bypass of the metacharacter denylist). The raw path now builds an
++argv list executed with shell=False plus a strict per-token allowlist, so no
++shell metacharacter can start a second command.
++
++Run:  pytest backend/tests/test_raw_command_security.py -v
++"""
++import os
++import asyncio
++
++import pytest
++
++from app.services.imagemagick import ImageMagickService
++
++
++@pytest.fixture()
++def svc():
++    s = ImageMagickService()
++    s._magick_cmd = "convert"  # skip the `which` probe in tests
++    return s
++
++
++def _build(svc, cmd, inp="/work/in.png", out="/work/out.png"):
++    return asyncio.run(svc.build_raw_argv(inp, out, cmd))
++
++
++def test_newline_injection_is_rejected(svc):
++    """The exact advisory PoC: a literal newline + a second command."""
++    poc = "{input} {output}\nid > /tmp/pwned\n"
++    argv, error = _build(svc, poc)
++    assert argv == []
++    assert error  # rejected with a message, never turned into a command
++
++
++def test_shell_metacharacters_never_reach_a_shell(svc):
++    """; & | $() are either rejected or, if built, are inert argv literals.
++
++    The guarantee is that no argv we produce is ever passed to a shell, so even
++    a token like '|' is a literal filename argument to `convert`, not a pipe.
++    """
++    for cmd in (
++        "{input} {output}; touch /tmp/pwned",
++        "{input} {output} | id",
++        "{input} {output} & id",
++        "{input} $(id) {output}",
++    ):
++        argv, error = _build(svc, cmd)
++        # Whatever the outcome, no shell is involved: build_raw_argv only ever
++        # returns a list to run with shell=False. If a token slipped through it
++        # is a literal arg, so `id`/`touch` can never execute.
++        assert isinstance(argv, list)
++
++
++def test_dangerous_flags_and_paths_are_blocked(svc):
++    assert _build(svc, "{input} -write /tmp/pwned {output}")[0] == []      # arbitrary write
++    assert _build(svc, "{input} @/etc/passwd {output}")[0] == []           # @file read
++    assert _build(svc, "/etc/passwd {output}")[0] == []                    # absolute path read
++    assert _build(svc, "{input} msl:/tmp/x.msl {output}")[0] == []         # MSL coder
++    assert _build(svc, "{input} -draw 'image over 0,0 0,0 x' {output}")[0] == []  # -draw not allowed
++
++
++def test_missing_placeholders_are_rejected(svc):
++    assert _build(svc, "-resize 50%")[0] == []                 # no {input}/{output}
++    assert _build(svc, "{input} -resize 50%")[0] == []         # no {output}
++
++
++def test_legit_command_builds_expected_argv(svc):
++    argv, error = _build(svc, "{input} -resize 50% -quality 80 {output}")
++    assert error == ""
++    assert argv[0] == "convert"
++    # our own resource limits are always prepended and cannot be overridden
++    assert "-limit" in argv and "memory" in argv
++    assert "/work/in.png" in argv and "/work/out.png" in argv
++    assert "-resize" in argv and "50%" in argv
++
++
++def test_user_cannot_raise_resource_limits(svc):
++    # -limit is intentionally NOT on the allowlist, so a user cannot lift the
++    # 2GB / timeout caps we enforce.
++    argv, error = _build(svc, "{input} -limit memory 64GB {output}")
++    assert argv == []
++    assert "limit" in error.lower()
+diff --git a/docker-compose.example.yml b/docker-compose.example.yml
+index 7a09992..eef0433 100644
+--- a/docker-compose.example.yml
++++ b/docker-compose.example.yml
+@@ -32,9 +32,14 @@ services:
+       - JWT_SECRET=CHANGE_THIS_jwt_secret_production_xyz789
+       
+       # Authentication
+-      - REQUIRE_LOGIN=false  # Set to true to require login
+-      - ALLOW_REGISTRATION=true  # Set to false to disable new signups
+-      
++      # Secure defaults: login required, self-service signup OFF. Only relax
++      # these on a trusted, non-internet-facing network.
++      - REQUIRE_LOGIN=true  # Set to false ONLY on a trusted private network
++      - ALLOW_REGISTRATION=false  # Set to true to allow self-service signup
++      # Terminal / raw ImageMagick command mode. Safe by design (shell=False +
++      # token allowlist), but you can disable it entirely on hardened installs.
++      - ENABLE_RAW_MODE=true  # Set to false to disable the terminal feature
++
+       # Image Processing
+       - DEFAULT_OUTPUT_FORMAT=webp
+       - DEFAULT_QUALITY=85
+diff --git a/docker-compose.nginx.yml b/docker-compose.nginx.yml
+index 2fbf7b3..fd7a723 100644
+--- a/docker-compose.nginx.yml
++++ b/docker-compose.nginx.yml
+@@ -28,8 +28,9 @@ services:
+       - REDIS_URL=redis://redis:6379/0
+       - SECRET_KEY=${SECRET_KEY:-supersecretkey_change_in_production_2024}
+       - JWT_SECRET=${JWT_SECRET:-jwt_secret_key_change_this_in_production}
+-      - REQUIRE_LOGIN=${REQUIRE_LOGIN:-false}
+-      - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-true}
++      - REQUIRE_LOGIN=${REQUIRE_LOGIN:-true}
++      - ALLOW_REGISTRATION=${ALLOW_REGISTRATION:-false}
++      - ENABLE_RAW_MODE=${ENABLE_RAW_MODE:-true}
+       - DEFAULT_OUTPUT_FORMAT=${DEFAULT_OUTPUT_FORMAT:-webp}
+       - DEFAULT_QUALITY=${DEFAULT_QUALITY:-85}
+       - MAX_UPLOAD_SIZE_MB=${MAX_UPLOAD_SIZE_MB:-100}

@@ -184,11 +184,22 @@ async def process_raw(
     current_user: Optional[User] = Depends(get_current_user_or_enforce)
 ):
     """Process images with raw ImageMagick command (terminal mode)"""
+    # Feature flag: raw/terminal mode can be turned off entirely.
+    if not settings.enable_raw_mode:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Raw/terminal mode is disabled on this server."
+        )
+
     user_id = current_user.id if current_user else None
-    
-    # Validate command
-    is_valid, error = imagemagick_service.validate_command(request.command)
-    if not is_valid:
+
+    # Pre-validate by building the argv (shell=False) the worker will run.
+    # This rejects disallowed flags / tokens up front with a clear error and
+    # guarantees the command can never reach a shell.
+    _argv, error = await imagemagick_service.build_raw_argv(
+        "{input}", "{output}", request.command
+    )
+    if error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid command: {error}"
