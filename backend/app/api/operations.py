@@ -262,18 +262,21 @@ async def preview_command(request: PreviewCommandRequest):
         "params": {"value": request.quality}
     })
     
-    # Build command with placeholder paths
-    command = await imagemagick_service.build_command(
-        "{input}",
-        f"{{output}}.{request.output_format}",
+    # Build the real argv with illustrative filenames, then render it back to a
+    # display string. This is presentation only — nothing here is executed.
+    argv = await imagemagick_service.build_argv(
+        "input.jpg",
+        f"output.{request.output_format}",
         operations
     )
-    
+
+    command = shlex.join(argv)
+
     # Validate
     is_valid, error = imagemagick_service.validate_command(command)
-    
+
     return CommandPreviewResponse(
-        command=command.replace("'{input}'", "input.jpg").replace("'{output}." + request.output_format + "'", f"output.{request.output_format}"),
+        command=command,
         valid=is_valid,
         error=error if not is_valid else None
     )
@@ -903,15 +906,15 @@ async def process_sync(
     logger.info(f"PROCESS-SYNC: operations={operations}")
     
     # Build and execute command
-    command = await imagemagick_service.build_command(
+    argv = await imagemagick_service.build_argv(
         validated_input_path,
         output_path,
         operations
     )
-    
-    logger.info(f"PROCESS-SYNC: command={command}")
-    
-    success, stdout, stderr = await imagemagick_service.execute(command)
+
+    logger.info(f"PROCESS-SYNC: argv={argv}")
+
+    success, stdout, stderr = await imagemagick_service.execute_argv(argv)
     
     if not success or not Path(output_path).exists():
         raise HTTPException(status_code=500, detail=f"Processing failed: {stderr}")
@@ -1017,13 +1020,13 @@ async def download_direct(
 
     validated_output_path = validate_path(output_path)
     
-    command = await imagemagick_service.build_command(
+    argv = await imagemagick_service.build_argv(
         validated_input_path,
         validated_output_path,
         operations
     )
-    
-    success, stdout, stderr = await imagemagick_service.execute(command)
+
+    success, stdout, stderr = await imagemagick_service.execute_argv(argv)
     
     if not success or not Path(validated_output_path).exists():
         raise HTTPException(status_code=500, detail=f"Processing failed: {stderr}")

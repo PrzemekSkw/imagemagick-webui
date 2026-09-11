@@ -6,13 +6,15 @@ import os
 import re
 import shlex
 import asyncio
+import logging
 import subprocess
 from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 import uuid
-from datetime import datetime
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class ImageMagickError(Exception):
@@ -111,7 +113,46 @@ class ImageMagickService:
     ALLOWED_OUTPUT_FORMATS = {
         "jpg", "jpeg", "png", "webp", "gif", "avif", "tiff", "pdf", "bmp", "ico"
     }
-    
+
+    # Colour values accepted from request params. ImageMagick's own colour
+    # parser is far more permissive than we need, so user input is narrowed to
+    # three well-understood shapes: a known name, a hex literal, or rgb()/rgba().
+    NAMED_COLORS = {
+        "white", "black", "red", "green", "blue", "yellow", "cyan", "magenta",
+        "gray", "grey", "orange", "purple", "brown", "pink", "silver", "gold",
+        "navy", "teal", "olive", "maroon", "lime", "aqua", "fuchsia",
+        "none", "transparent",
+    }
+
+    _COLOR_HEX_RE = re.compile(r"^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$")
+    _COLOR_FUNC_RE = re.compile(
+        r"^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*"
+        r"(?:,\s*(?:0|1|0?\.\d+)\s*)?\)$"
+    )
+
+    @classmethod
+    def _safe_color(cls, value, default: str = "white") -> str:
+        """
+        Reduce a user-supplied colour to a form ImageMagick parses predictably.
+
+        Anything unrecognised falls back to `default` rather than raising: these
+        values arrive as free-form request params, and a bad colour should not
+        turn an otherwise valid edit into a 500.
+        """
+        import logging
+
+        color = str(value).strip().lower()
+        if color in cls.NAMED_COLORS:
+            return color
+        if cls._COLOR_HEX_RE.match(color) or cls._COLOR_FUNC_RE.match(color):
+            return color
+
+        logging.getLogger(__name__).warning(
+            f"Rejected colour value {value!r}, falling back to {default!r}"
+        )
+        return default
+
+
     def __init__(self):
         self.timeout = settings.imagemagick_timeout
         self.memory_limit = settings.imagemagick_memory_limit
@@ -126,8 +167,8 @@ class ImageMagickService:
         
         for cmd in ["magick", "convert"]:
             try:
-                process = await asyncio.create_subprocess_shell(
-                    f"which {cmd}",
+                process = await asyncio.create_subprocess_exec(
+                    "which", cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
@@ -135,9 +176,9 @@ class ImageMagickService:
                 if process.returncode == 0:
                     self._magick_cmd = cmd
                     return cmd
-            except:
+            except OSError:
                 pass
-        
+
         self._magick_cmd = "magick"  # Default fallback
         return self._magick_cmd
     
@@ -170,40 +211,44 @@ class ImageMagickService:
         filename = re.sub(r'[^\w\-_\.]', '_', filename)
         return filename
     
-    async def build_command(
+    async def build_argv(
         self,
         input_path: str,
         output_path: str,
         operations: List[Dict]
-    ) -> str:
+    ) -> List[str]:
         """
-        Build a safe ImageMagick command from operations
+        Build an ARGV LIST for the requested operations.
+
+        Returns a list executed with shell=False, so no parameter value can ever
+        be interpreted as a shell metacharacter. Every value below is either
+        cast to int/float, mapped through a lookup table, or passed through
+        _safe_color() — user strings never reach the argument list verbatim.
         """
         magick_cmd = await self._get_magick_cmd()
-        
-        cmd_parts = [
+
+        argv: List[str] = [
             magick_cmd,
-            f"-limit memory {self.memory_limit}",
-            f"-limit time {self.timeout}",
+            "-limit", "memory", str(self.memory_limit),
+            "-limit", "time", str(self.timeout),
         ]
-        
+
         # Check if input is PDF
         is_pdf = input_path.lower().endswith('.pdf')
-        
+
         if is_pdf:
             # For PDF: add density before input for better quality
-            cmd_parts.append("-density 150")
+            argv += ["-density", "150"]
             # Add input file with page selector [0] for first page
-            cmd_parts.append(shlex.quote(f"{input_path}[0]"))
+            argv.append(f"{input_path}[0]")
             # Flatten to handle transparency
-            cmd_parts.append("-flatten")
+            argv.append("-flatten")
         else:
-            # Add input file (quoted and validated)
-            cmd_parts.append(shlex.quote(input_path))
-        
+            argv.append(input_path)
+
         # Always auto-orient to fix EXIF rotation issues
-        cmd_parts.append("-auto-orient")
-        
+        argv.append("-auto-orient")
+
         # Process operations
         # Get image dimensions for scaling
         img_width = None
@@ -211,131 +256,132 @@ class ImageMagickService:
             from PIL import Image as PILImage
             with PILImage.open(input_path) as pil_img:
                 img_width = pil_img.width
-        except:
+        except Exception:
             pass
 
         for op in operations:
             op_name = op.get("operation", "").lower().replace("_", "-")
             params = op.get("params", {})
-            
+
             if op_name not in self.ALLOWED_OPERATIONS:
                 continue
-            
-            # Build operation string based on type
+
+            # Build operation arguments based on type
             if op_name == "resize":
                 width = int(params.get("width", 0))
                 height = int(params.get("height", 0))
                 mode = params.get("mode", "")
-                
+
                 if width > 0 and height > 0:
                     geometry = f"{width}x{height}"
                     if mode == "force":
                         geometry += "!"
                     elif mode == "fill":
                         geometry += "^"
-                    cmd_parts.append(f"-resize {geometry}")
+                    argv += ["-resize", geometry]
                 elif params.get("percent"):
                     pct = int(params["percent"])
-                    cmd_parts.append(f"-resize {pct}%")
-            
+                    argv += ["-resize", f"{pct}%"]
+
             elif op_name == "crop":
                 width = int(params.get("width", 0))
                 height = int(params.get("height", 0))
                 x = int(params.get("x", 0))
                 y = int(params.get("y", 0))
                 if width > 0 and height > 0:
-                    cmd_parts.append(f"-crop {width}x{height}+{x}+{y} +repage")
-            
-            elif op_name == "crop_aspect":
+                    argv += ["-crop", f"{width}x{height}+{x}+{y}", "+repage"]
+
+            elif op_name == "crop-aspect":
                 aspect_w = int(params.get("aspect_w", 1))
                 aspect_h = int(params.get("aspect_h", 1))
-                cmd_parts.append("-gravity center")
-                cmd_parts.append(f"-crop {aspect_w}:{aspect_h}")
-                cmd_parts.append("+repage")
-            
+                argv += ["-gravity", "center"]
+                argv += ["-crop", f"{aspect_w}:{aspect_h}"]
+                argv.append("+repage")
+
             elif op_name == "rotate":
                 angle = float(params.get("angle", 0))
-                cmd_parts.append(f"-rotate {angle}")
-            
+                argv += ["-rotate", str(angle)]
+
             elif op_name == "flip":
-                cmd_parts.append("-flip")
-            
+                argv.append("-flip")
+
             elif op_name == "flop":
-                cmd_parts.append("-flop")
-            
+                argv.append("-flop")
+
             elif op_name == "quality":
                 quality = max(1, min(100, int(params.get("value", 85))))
-                cmd_parts.append(f"-quality {quality}")
-            
+                argv += ["-quality", str(quality)]
+
             elif op_name == "blur":
                 css_blur = float(params.get("sigma", params.get("radius", 0)))
-                import logging
-                logger = logging.getLogger(__name__)
                 if css_blur > 0:
                     if img_width and img_width > 800:
                         scale_factor = img_width / 800
                         sigma = css_blur * scale_factor
                     else:
                         sigma = css_blur * 1.0
-                    cmd_parts.append(f"-blur 0x{sigma:.1f}")
-                    logger.info(f"BLUR: css_blur={css_blur}, img_width={img_width}, sigma={sigma:.1f}")
-            
+                    argv += ["-blur", f"0x{sigma:.1f}"]
+                    logger.info(
+                        f"BLUR: css_blur={css_blur}, img_width={img_width}, sigma={sigma:.1f}"
+                    )
+
             elif op_name == "sharpen":
                 radius = float(params.get("radius", 0))
                 sigma = float(params.get("sigma", 1))
-                cmd_parts.append(f"-sharpen {radius}x{sigma}")
-            
+                argv += ["-sharpen", f"{radius}x{sigma}"]
+
             elif op_name == "grayscale":
-                cmd_parts.append("-colorspace Gray")
-            
+                argv += ["-colorspace", "Gray"]
+
             elif op_name == "sepia-tone":
                 threshold = float(params.get("threshold", 80))
-                cmd_parts.append(f"-sepia-tone {threshold}%")
-            
+                argv += ["-sepia-tone", f"{threshold}%"]
+
             elif op_name == "brightness-contrast":
                 brightness = int(params.get("brightness", 0))
                 contrast = int(params.get("contrast", 0))
-                cmd_parts.append(f"-brightness-contrast {brightness}x{contrast}")
-            
+                argv += ["-brightness-contrast", f"{brightness}x{contrast}"]
+
             elif op_name == "modulate":
                 brightness = int(params.get("brightness", 100))
                 saturation = int(params.get("saturation", 100))
                 hue = int(params.get("hue", 100))
-                cmd_parts.append(f"-modulate {brightness},{saturation},{hue}")
-            
+                argv += ["-modulate", f"{brightness},{saturation},{hue}"]
+
             elif op_name == "auto-orient":
-                cmd_parts.append("-auto-orient")
-            
+                argv.append("-auto-orient")
+
             elif op_name == "enhance":
-                cmd_parts.append("-normalize")
-                cmd_parts.append("-modulate 100,110,100")
-                cmd_parts.append("-unsharp 0x0.5+0.5+0.008")
-            
+                argv.append("-normalize")
+                argv += ["-modulate", "100,110,100"]
+                argv += ["-unsharp", "0x0.5+0.5+0.008"]
+
             elif op_name == "auto-level":
-                cmd_parts.append("-auto-level")
-            
+                argv.append("-auto-level")
+
             elif op_name == "normalize":
-                cmd_parts.append("-normalize")
-            
+                argv.append("-normalize")
+
             elif op_name == "strip":
-                cmd_parts.append("-strip")
-            
+                argv.append("-strip")
+
             elif op_name == "trim":
-                cmd_parts.append("-trim +repage")
-            
+                argv += ["-trim", "+repage"]
+
             elif op_name == "negate":
-                cmd_parts.append("-negate")
-            
+                argv.append("-negate")
+
             elif op_name == "annotate" or op_name == "watermark":
                 text = params.get("text", "")
                 if text:
-                    text = re.sub(r'[`$\\]', '', text)
+                    # Text is a single argv token, so it needs no escaping; it is
+                    # still length-capped so a huge string cannot blow up argv.
+                    text = str(text)[:500]
                     position = params.get("position", "southeast").lower()
                     font_size_base = int(params.get("font_size", 24))
                     font_size = max(font_size_base, int(font_size_base * (img_width / 800))) if img_width else font_size_base
-                    color = params.get("color", "white")
-                    opacity = float(params.get("opacity", 0.5))
-                    
+                    opacity = max(0.0, min(1.0, float(params.get("opacity", 0.5))))
+
                     gravity_map = {
                         "northwest": "NorthWest",
                         "north": "North", 
@@ -348,69 +394,38 @@ class ImageMagickService:
                         "southeast": "SouthEast",
                     }
                     gravity = gravity_map.get(position, "SouthEast")
-                    
+
                     shadow_offset = max(2, int(font_size * 0.05))
                     text_offset = max(10, int(font_size * 0.4))
-                    
-                    cmd_parts.append(f"-gravity {gravity}")
-                    cmd_parts.append(f"-pointsize {font_size}")
-                    cmd_parts.append(f"-fill 'rgba(0,0,0,{opacity})'")
-                    cmd_parts.append(f"-annotate +{text_offset + shadow_offset}+{text_offset + shadow_offset} {shlex.quote(text)}")
-                    cmd_parts.append(f"-fill 'rgba(255,255,255,{opacity})'")
-                    cmd_parts.append(f"-annotate +{text_offset}+{text_offset} {shlex.quote(text)}")
-            
+
+                    argv += ["-gravity", gravity]
+                    argv += ["-pointsize", str(font_size)]
+                    argv += ["-fill", f"rgba(0,0,0,{opacity})"]
+                    argv += [
+                        "-annotate",
+                        f"+{text_offset + shadow_offset}+{text_offset + shadow_offset}",
+                        text,
+                    ]
+                    argv += ["-fill", f"rgba(255,255,255,{opacity})"]
+                    argv += ["-annotate", f"+{text_offset}+{text_offset}", text]
+
             elif op_name == "transparent":
-                color = params.get("color", "white").lower()
-                fuzz = int(params.get("fuzz", 10))
-                fuzz = max(0, min(100, fuzz))
-                
-                if color == "auto":
-                    cmd_parts.append("-alpha set")
-                    cmd_parts.append(f"-fuzz {fuzz}%")
-                    cmd_parts.append("-fill none -draw 'color 0,0 floodfill'")
-                elif color in ("white", "black", "red", "green", "blue", "transparent"):
-                    cmd_parts.append("-alpha set")
-                    cmd_parts.append(f"-fuzz {fuzz}%")
-                    cmd_parts.append(f"-transparent {color}")
+                raw_color = str(params.get("color", "white")).strip().lower()
+                fuzz = max(0, min(100, int(params.get("fuzz", 10))))
+
+                argv.append("-alpha")
+                argv.append("set")
+                argv += ["-fuzz", f"{fuzz}%"]
+
+                if raw_color == "auto":
+                    argv += ["-fill", "none", "-draw", "color 0,0 floodfill"]
                 else:
-                    cmd_parts.append("-alpha set")
-                    cmd_parts.append(f"-fuzz {fuzz}%")
-                    cmd_parts.append(f"-transparent '{color}'")
-        
+                    argv += ["-transparent", self._safe_color(raw_color)]
+
         # Add output file
-        cmd_parts.append(shlex.quote(output_path))
-        
-        return " ".join(cmd_parts)
-    
-    async def build_raw_command(
-        self,
-        input_path: str,
-        output_path: str,
-        raw_command: str
-    ) -> Tuple[str, str]:
-        """
-        Build command from raw user input (terminal mode)
-        Returns (command, error_message)
-        """
-        is_valid, error = self.validate_command(raw_command)
-        if not is_valid:
-            return "", error
-        
-        magick_cmd = await self._get_magick_cmd()
-        
-        command = raw_command.replace("{input}", shlex.quote(input_path))
-        command = command.replace("{output}", shlex.quote(output_path))
-        
-        if not command.strip().startswith(("magick", "convert")):
-            command = f"{magick_cmd} {command}"
-        
-        limits = f"-limit memory {self.memory_limit} -limit time {self.timeout}"
-        if command.strip().startswith("magick"):
-            command = command.replace("magick ", f"magick {limits} ", 1)
-        elif command.strip().startswith("convert"):
-            command = command.replace("convert ", f"convert {limits} ", 1)
-        
-        return command, ""
+        argv.append(output_path)
+
+        return argv
 
     def _validate_raw_token(self, token: str) -> Tuple[bool, str]:
         """Validate a single token from a raw/terminal command."""
@@ -531,85 +546,12 @@ class ImageMagickService:
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             return await loop.run_in_executor(executor, self._run_argv_sync, argv)
 
-    def _run_command_sync(self, command: str) -> Tuple[bool, str, str]:
-        """
-        Synchronous command execution in a clean environment.
-        This runs in a thread pool to avoid blocking the event loop.
-        """
-        import logging
-        import os
-        import signal
-        logger = logging.getLogger(__name__)
-        
-        clean_env = {
-            'PATH': '/usr/local/bin:/usr/bin:/bin',
-            'HOME': '/tmp',
-            'TMPDIR': '/tmp',
-            'MAGICK_TEMPORARY_PATH': '/tmp',
-            'LC_ALL': 'C',
-        }
-        
-        def preexec():
-            os.setsid()
-            signal.signal(signal.SIGINT, signal.SIG_DFL)
-            signal.signal(signal.SIGTERM, signal.SIG_DFL)
-        
-        try:
-            logger.debug(f"Executing command: {command}")
-            
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                timeout=self.timeout,
-                cwd=str(self.temp_dir),
-                env=clean_env,
-                preexec_fn=preexec,
-                close_fds=True,
-            )
-            
-            success = result.returncode == 0
-            stdout_str = result.stdout.decode('utf-8', errors='replace')
-            stderr_str = result.stderr.decode('utf-8', errors='replace')
-            
-            if not success:
-                logger.warning(f"Command failed (exit {result.returncode}): {stderr_str}")
-            
-            return success, stdout_str, stderr_str
-            
-        except subprocess.TimeoutExpired:
-            logger.error(f"Command timed out after {self.timeout}s: {command}")
-            return False, "", f"Command timed out after {self.timeout} seconds"
-        except Exception as e:
-            logger.exception(f"Command execution error: {e}")
-            return False, "", str(e)
-    
-    async def execute(self, command: str) -> Tuple[bool, str, str]:
-        """
-        Execute ImageMagick command with timeout and resource limits
-        Returns (success, stdout, stderr)
-        """
-        import concurrent.futures
-        
-        loop = asyncio.get_event_loop()
-        
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            result = await loop.run_in_executor(
-                executor,
-                self._run_command_sync,
-                command
-            )
-        
-        return result
-    
     async def get_image_info(self, file_path: str) -> Optional[Dict]:
         """Get image metadata using ImageMagick identify"""
-        magick_cmd = await self._get_magick_cmd()
-        
-        command = f"identify -verbose {shlex.quote(file_path)}"
-        
-        success, stdout, stderr = await self.execute(command)
-        
+        success, stdout, stderr = await self.execute_argv(
+            ["identify", "-verbose", file_path]
+        )
+
         if not success:
             return None
         
@@ -647,9 +589,6 @@ class ImageMagickService:
         size: int = 300
     ) -> bool:
         """Create a thumbnail of the image"""
-        import logging
-        logger = logging.getLogger(__name__)
-        
         # Ensure output directory exists
         output_dir = Path(output_path).parent
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -669,33 +608,40 @@ class ImageMagickService:
             temp_base = str(Path(output_path).with_suffix(''))
             temp_file = f"{temp_base}.png"
             
-            pdftoppm_cmd = f'pdftoppm -png -f 1 -l 1 -r 150 -singlefile "{input_path}" "{temp_base}"'
-            logger.info(f"PDF thumbnail command: {pdftoppm_cmd}")
-            
+            pdftoppm_argv = [
+                "pdftoppm", "-png", "-f", "1", "-l", "1", "-r", "150",
+                "-singlefile", input_path, temp_base,
+            ]
+            logger.info(f"PDF thumbnail argv: {pdftoppm_argv}")
+
             try:
-                process = await asyncio.create_subprocess_shell(
-                    pdftoppm_cmd,
+                process = await asyncio.create_subprocess_exec(
+                    *pdftoppm_argv,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
                 stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=120)
-                
+
                 logger.info(f"pdftoppm returncode: {process.returncode}, checking for: {temp_file}")
-                
+
                 if process.returncode == 0 and Path(temp_file).exists():
+                    success, resize_err = False, ""
                     for resize_cmd_name in ["magick", "convert"]:
-                        resize_cmd = f'{resize_cmd_name} "{temp_file}" -thumbnail "{size}x{size}>" -quality 85 "{output_path}"'
-                        success, _, resize_err = await self.execute(resize_cmd)
+                        success, _, resize_err = await self.execute_argv([
+                            resize_cmd_name, temp_file,
+                            "-thumbnail", f"{size}x{size}>",
+                            "-quality", "85", output_path,
+                        ])
                         if success:
                             break
                         if "not found" not in resize_err.lower():
                             break
-                    
+
                     try:
                         Path(temp_file).unlink()
-                    except:
+                    except OSError:
                         pass
-                    
+
                     if success and Path(output_path).exists():
                         logger.info(f"PDF thumbnail created: {output_path}")
                         return True
@@ -707,15 +653,17 @@ class ImageMagickService:
                 logger.error("pdftoppm timeout")
             except Exception as e:
                 logger.exception(f"PDF thumbnail exception: {e}")
-            
+
             # Method 2: Fallback to ImageMagick with ghostscript
             logger.info("Trying ImageMagick fallback for PDF")
             for cmd in ["magick", "convert"]:
                 try:
-                    command = f'{cmd} -density 150 "{input_path}[0]" -thumbnail "{size}x{size}>" -quality 85 "{output_path}"'
-                    logger.info(f"PDF fallback command: {command}")
-                    success, stdout, stderr = await self.execute(command)
-                    
+                    success, stdout, stderr = await self.execute_argv([
+                        cmd, "-density", "150", f"{input_path}[0]",
+                        "-thumbnail", f"{size}x{size}>",
+                        "-quality", "85", output_path,
+                    ])
+
                     if success and Path(output_path).exists() and Path(output_path).stat().st_size > 0:
                         logger.info(f"PDF thumbnail created (fallback): {output_path}")
                         return True
@@ -724,30 +672,38 @@ class ImageMagickService:
                 except Exception as e:
                     logger.exception(f"PDF fallback exception ({cmd}): {e}")
                     continue
-            
+
             # Method 3: Try gs directly
             logger.info("Trying ghostscript directly for PDF")
             try:
                 gs_output = str(Path(output_path).with_suffix('.png'))
-                gs_cmd = f'gs -dNOPAUSE -dBATCH -sDEVICE=png16m -r150 -dFirstPage=1 -dLastPage=1 -sOutputFile="{gs_output}" "{input_path}"'
-                logger.info(f"GS command: {gs_cmd}")
-                
-                process = await asyncio.create_subprocess_shell(
-                    gs_cmd,
+                gs_argv = [
+                    "gs", "-dNOPAUSE", "-dBATCH", "-sDEVICE=png16m", "-r150",
+                    "-dFirstPage=1", "-dLastPage=1",
+                    f"-sOutputFile={gs_output}", input_path,
+                ]
+                logger.info(f"GS argv: {gs_argv}")
+
+                process = await asyncio.create_subprocess_exec(
+                    *gs_argv,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
                 await asyncio.wait_for(process.communicate(), timeout=120)
-                
+
                 if Path(gs_output).exists():
+                    success = False
                     for resize_cmd_name in ["magick", "convert"]:
-                        resize_cmd = f'{resize_cmd_name} "{gs_output}" -thumbnail "{size}x{size}>" -quality 85 "{output_path}"'
-                        success, _, _ = await self.execute(resize_cmd)
+                        success, _, _ = await self.execute_argv([
+                            resize_cmd_name, gs_output,
+                            "-thumbnail", f"{size}x{size}>",
+                            "-quality", "85", output_path,
+                        ])
                         if success:
                             break
                     try:
                         Path(gs_output).unlink()
-                    except:
+                    except OSError:
                         pass
                     if success and Path(output_path).exists():
                         logger.info(f"PDF thumbnail created (gs): {output_path}")
@@ -794,10 +750,12 @@ class ImageMagickService:
             # Fallback: use ImageMagick (for formats Pillow can't handle)
             for cmd in ["magick", "convert"]:
                 try:
-                    command = f'{cmd} "{input_path}" -thumbnail "{size}x{size}>" -quality 85 "{output_path}"'
-                    logger.info(f"Thumbnail command: {command}")
-                    success, stdout, stderr = await self.execute(command)
-                    
+                    success, stdout, stderr = await self.execute_argv([
+                        cmd, input_path,
+                        "-thumbnail", f"{size}x{size}>",
+                        "-quality", "85", output_path,
+                    ])
+
                     if success and Path(output_path).exists() and Path(output_path).stat().st_size > 0:
                         logger.info(f"Thumbnail created: {output_path}")
                         return True
@@ -807,27 +765,10 @@ class ImageMagickService:
                 except Exception as e:
                     logger.exception(f"Thumbnail exception ({cmd}): {e}")
                     continue
-        
+
         logger.error(f"All thumbnail attempts failed for: {input_path}")
         return False
-    
-    async def create_pdf_preview(
-        self,
-        input_path: str,
-        output_path: str,
-        page: int = 0,
-        density: int = 150
-    ) -> bool:
-        """Create a preview image of a PDF page"""
-        for cmd in ["magick", "convert"]:
-            command = f"{cmd} -density {density} {shlex.quote(input_path)}[{page}] -background white -alpha remove -quality 90 {shlex.quote(output_path)}"
-            success, _, stderr = await self.execute(command)
-            if success:
-                return True
-            if "not found" not in stderr.lower():
-                break
-        return False
-    
+
     async def apply_preview(
         self,
         input_path: str,
@@ -839,27 +780,25 @@ class ImageMagickService:
         Returns base64 encoded image data or None on error
         """
         import base64
-        import logging
-        logger = logging.getLogger(__name__)
-        
+
         if not Path(input_path).exists():
             logger.error(f"Input file not found: {input_path}")
             return None
-        
+
         output_path = self.generate_temp_path("webp")
-        
+
         try:
             preview_ops = operations.copy()
             preview_ops.insert(0, {
                 "operation": "resize",
                 "params": {"width": max_size, "height": max_size, "mode": "fit"}
             })
-            
-            command = await self.build_command(input_path, output_path, preview_ops)
-            logger.info(f"Preview command: {command}")
-            
-            success, stdout, stderr = await self.execute(command)
-            
+
+            argv = await self.build_argv(input_path, output_path, preview_ops)
+            logger.info(f"Preview argv: {argv}")
+
+            success, stdout, stderr = await self.execute_argv(argv)
+
             if success and Path(output_path).exists():
                 with open(output_path, "rb") as f:
                     data = base64.b64encode(f.read()).decode()
