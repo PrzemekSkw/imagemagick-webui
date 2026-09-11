@@ -534,6 +534,17 @@ class ImageMagickService:
         except subprocess.TimeoutExpired:
             logger.error(f"Command timed out after {self.timeout}s")
             return False, "", f"Command timed out after {self.timeout} seconds"
+        except FileNotFoundError:
+            # A missing binary is an expected, recoverable condition: this image
+            # ships ImageMagick 6, which has `convert` but no `magick`, and the
+            # callers below probe for one then fall back to the other.
+            #
+            # Under shell=True this surfaced as exit 127 with "sh: magick: not
+            # found" on stderr, which is what those callers match on. shell=False
+            # raises instead, so the wording is reproduced here — otherwise the
+            # fallback chain breaks and the first missing binary aborts it.
+            logger.info(f"Executable not available: {argv[0]}")
+            return False, "", f"{argv[0]}: not found"
         except Exception as exc:
             logger.exception(f"Command execution error: {exc}")
             return False, "", str(exc)

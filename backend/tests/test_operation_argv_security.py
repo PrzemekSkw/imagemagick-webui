@@ -114,6 +114,30 @@ def test_resource_limits_are_always_prepended(svc):
     assert argv[4:7] == ["-limit", "time", str(svc.timeout)]
 
 
+# --- binary fallback ------------------------------------------------------
+
+def test_missing_binary_reports_not_found(svc):
+    """
+    create_thumbnail probes `magick` then falls back to `convert` by matching
+    "not found" in stderr. shell=True produced that wording via the shell's
+    exit-127 message; shell=False raises FileNotFoundError instead, so the
+    wording has to be reproduced or the fallback chain aborts on the first
+    missing binary (as it does on ImageMagick 6, which has no `magick`).
+    """
+    ok, _, stderr = asyncio.run(
+        svc.execute_argv(["definitely-not-a-real-binary-xyz", "-version"])
+    )
+    assert ok is False
+    assert "not found" in stderr.lower()
+
+
+def test_existing_binary_still_runs(svc):
+    """The fallback shim must not swallow successful executions."""
+    ok, stdout, _ = asyncio.run(svc.execute_argv(["echo", "ok"]))
+    assert ok is True
+    assert stdout.strip() == "ok"
+
+
 def test_unknown_operations_are_dropped(svc):
     """An operation outside the allowlist contributes nothing to argv."""
     argv = _build(svc, [{"operation": "evil", "params": {"anything": "; id"}}])
