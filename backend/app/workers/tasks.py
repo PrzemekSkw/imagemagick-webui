@@ -60,18 +60,19 @@ def process_images(
             asyncio.set_event_loop(loop)
             
             try:
-                # Build command (async)
-                command = loop.run_until_complete(
-                    imagemagick_service.build_command(
+                # Build an ARGV LIST and run it with shell=False, so no operation
+                # parameter can ever be read as a shell metacharacter.
+                argv = loop.run_until_complete(
+                    imagemagick_service.build_argv(
                         input_path,
                         output_path,
                         operations
                     )
                 )
-                
+
                 # Execute command
                 success, stdout, stderr = loop.run_until_complete(
-                    imagemagick_service.execute(command)
+                    imagemagick_service.execute_argv(argv)
                 )
             finally:
                 loop.close()
