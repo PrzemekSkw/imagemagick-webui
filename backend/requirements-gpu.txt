@@ -27,7 +27,7 @@ python-magic>=0.4.27,<1.0.0
 Pillow>=10.2.0,<13.0.0
 
 # AI Background Removal — GPU
-rembg>=2.0.76,<2.0.77
+rembg>=2.0.85,<2.0.86
 onnxruntime-gpu>=1.29.0,<1.30.0
 pymatting>=1.1.15,<2.0.0
 scipy>=1.18.0,<2.0.0
