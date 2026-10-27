@@ -2,10 +2,14 @@
 Health check endpoints
 """
 
-from fastapi import APIRouter
-from datetime import datetime
+import logging
 import os
+import subprocess
+from datetime import datetime
 
+from fastapi import APIRouter
+
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -23,7 +27,7 @@ async def health_check():
 async def config_check():
     """Check configuration values (for debugging)"""
     from app.core.config import settings
-    
+
     return {
         "require_login": settings.require_login,
         "default_output_format": settings.default_output_format,
@@ -38,32 +42,39 @@ async def config_check():
 async def readiness_check():
     """Readiness check including dependencies"""
     from app.core.config import settings
+    from app.services.imagemagick import imagemagick_service
     import redis
-    
+
     checks = {
         "api": True,
         "redis": False,
         "imagemagick": False
     }
-    
+
     # Check Redis
     try:
         r = redis.from_url(settings.redis_url)
         r.ping()
         checks["redis"] = True
-    except Exception:
-        pass
-    
-    # Check ImageMagick
+    except Exception as e:
+        logger.warning("Readiness: Redis check failed: %s", e)
+
+    # Check ImageMagick. IM6 images ship 'convert', IM7 ships 'magick';
+    # the service knows which one is installed.
     try:
-        import subprocess
-        result = subprocess.run(["magick", "-version"], capture_output=True)
+        cmd = imagemagick_service.resolve_magick_cmd()
+        result = subprocess.run([cmd, "-version"], capture_output=True, timeout=5)
         checks["imagemagick"] = result.returncode == 0
-    except Exception:
-        pass
-    
+        if result.returncode != 0:
+            logger.warning(
+                "Readiness: '%s -version' exited %s: %s",
+                cmd, result.returncode, result.stderr.decode(errors="replace")[:200],
+            )
+    except Exception as e:
+        logger.warning("Readiness: ImageMagick check failed: %s", e)
+
     all_healthy = all(checks.values())
-    
+
     return {
         "status": "ready" if all_healthy else "degraded",
         "timestamp": datetime.utcnow().isoformat(),

@@ -2,6 +2,7 @@
 Images API endpoints for upload and management
 """
 
+import asyncio
 import logging
 import shlex
 import os
@@ -343,6 +344,8 @@ async def get_preview(
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=180)
+        if process.returncode != 0:
+            logger.warning("PDF preview step exited %s: %s", process.returncode, stderr.decode(errors='replace')[:300])
         
         if process.returncode == 0 and Path(validated_preview).exists():
             return FileResponse(
@@ -355,13 +358,15 @@ async def get_preview(
     
     # Fallback to ImageMagick with safe arguments
     try:
-        magick_cmd = ['magick', '-density', '150', f'{validated_path}[{page}]', '-background', 'white', '-alpha', 'remove', '-quality', '90', validated_preview]
+        magick_cmd = [await imagemagick_service._get_magick_cmd(), '-density', '150', f'{validated_path}[{page}]', '-background', 'white', '-alpha', 'remove', '-quality', '90', validated_preview]
         process = await asyncio.create_subprocess_exec(
             *magick_cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=180)
+        if process.returncode != 0:
+            logger.warning("PDF preview step exited %s: %s", process.returncode, stderr.decode(errors='replace')[:300])
         
         if process.returncode == 0 and Path(validated_preview).exists():
             return FileResponse(
