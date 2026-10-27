@@ -137,7 +137,7 @@ class AIService:
                     f"Creating rembg session: model={model}, "
                     f"providers={[p[0] if isinstance(p, tuple) else p for p in providers]}"
                 )
-                # rembg 2.0.76: new_session(model, **kwargs) forwards `providers`
+                # rembg 2.0.86: new_session(model, **kwargs) forwards `providers`
                 # to BaseSession, which honors an explicit list.
                 self._sessions[model] = new_session(model, providers=providers)
                 logger.info(f"Session created successfully for model: {model}")
