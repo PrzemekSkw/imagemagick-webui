@@ -6,6 +6,7 @@ import os
 import re
 import shlex
 import asyncio
+import shutil
 import logging
 import subprocess
 from typing import List, Dict, Optional, Tuple
@@ -160,28 +161,25 @@ class ImageMagickService:
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self._magick_cmd = None  # Will be detected on first use
     
-    async def _get_magick_cmd(self) -> str:
-        """Detect which ImageMagick command is available"""
+    def resolve_magick_cmd(self) -> str:
+        """Return the ImageMagick CLI on PATH: 'magick' (IM7) or 'convert' (IM6).
+
+        The Debian base image ships ImageMagick 6, which has no 'magick'.
+        Anything that shells out to ImageMagick must use this instead of
+        hardcoding a binary name.
+        """
         if self._magick_cmd:
             return self._magick_cmd
-        
-        for cmd in ["magick", "convert"]:
-            try:
-                process = await asyncio.create_subprocess_exec(
-                    "which", cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                await process.communicate()
-                if process.returncode == 0:
-                    self._magick_cmd = cmd
-                    return cmd
-            except OSError:
-                pass
+        for cmd in ("magick", "convert"):
+            if shutil.which(cmd):
+                self._magick_cmd = cmd
+                return cmd
+        logger.warning("ImageMagick not found on PATH (tried 'magick' and 'convert')")
+        return "magick"  # not cached, so a later install is picked up
 
-        self._magick_cmd = "magick"  # Default fallback
-        return self._magick_cmd
-    
+    async def _get_magick_cmd(self) -> str:
+        return self.resolve_magick_cmd()
+
     def validate_file(self, file_path: str) -> bool:
         """Validate that file exists and has allowed extension"""
         path = Path(file_path)
