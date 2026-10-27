@@ -24,10 +24,10 @@ Wand>=0.7.1,<1.0.0
 
 aiofiles>=25.1.0,<26.0.0
 python-magic>=0.4.27,<1.0.0
-Pillow>=10.2.0,<13.0.0
+pillow>=13.0.0,<14.0.0
 
 # AI Background Removal — GPU
-rembg>=2.0.76,<2.0.77
+rembg>=2.0.86,<2.1.0
 onnxruntime-gpu>=1.16.0,<1.25.0
 pymatting>=1.1.15,<2.0.0
 scipy>=1.18.0,<2.0.0
