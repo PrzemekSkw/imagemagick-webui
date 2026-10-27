@@ -3,7 +3,7 @@
 # Keep every other pin in sync with requirements.txt.
 
 fastapi>=0.110.0,<1.0.0
-uvicorn[standard]>=0.52.3,<1.0.0
+uvicorn[standard]>=0.52.4,<1.0.0
 python-multipart>=0.0.32,<1.0.0
 python-jose[cryptography]>=3.5.0,<4.0.0
 bcrypt>=4.0.0,<5.0.0
@@ -13,14 +13,14 @@ httpx>=0.28.1,<1.0.0
 sqlalchemy[asyncio]>=2.0.51,<3.0.0
 asyncpg>=0.31.0,<1.0.0
 
-redis>=7.4.0,<8.0.0
+redis>=8.1.0,<9.0.0
 rq>=1.16.0,<3.0.0
 
 pydantic>=2.6.0,<3.0.0
 pydantic-settings>=2.14.2,<3.0.0
 email-validator>=2.3.0,<3.0.0
 
-Wand>=0.7.1,<1.0.0
+Wand>=0.7.2,<1.0.0
 
 aiofiles>=25.1.0,<26.0.0
 python-magic>=0.4.27,<1.0.0
@@ -28,7 +28,7 @@ pillow>=13.0.0,<14.0.0
 
 # AI Background Removal — GPU
 rembg>=2.0.86,<2.1.0
-onnxruntime-gpu>=1.16.0,<1.25.0
+onnxruntime-gpu>=1.29.0,<1.30.0
 pymatting>=1.1.15,<2.0.0
 scipy>=1.18.0,<2.0.0
 
